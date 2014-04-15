@@ -32,8 +32,8 @@ public:
 	typedef sigc::signal<void, S2EExecutionState*, uint64_t> SyscallReturnSignal;
 	typedef sigc::signal<void, S2EExecutionState*, uint64_t, SyscallType, 
 						uint32_t, SyscallReturnSignal& > SyscallSignal;
-
-	typedef std::map< uint32_t, std::vector< LinuxSyscallMonitor::SyscallReturnSignal >> SyscallReturnSignalsMap;
+	typedef std::map< uint32_t, std::vector< SyscallMonitor::SyscallReturnSignal >> 
+					SyscallReturnSignalsMap;
 
 	SyscallMonitor(S2E *s2e): Plugin(s2e) {}
 	virtual ~SyscallMonitor();

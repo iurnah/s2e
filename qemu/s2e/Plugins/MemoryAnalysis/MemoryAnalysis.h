@@ -14,10 +14,12 @@ class MemoryAnalysis: public Plugin
 
 public:
 	MemoryAnalysis(S2E *s2e): Plugin(s2e) {	}
-	sigc::signal<void, S2EExecutionState *, uint64_t> onXXX;
+	//probably we need more customized signals in future
+	sigc::signal<void, S2EExecutionState *, uint64_t> ;
 	
 	void initialize();
-	void MemberFunction(S2EExecutionState *state, uint64_t pc);
+	void onModuleLoad(S2EExecutionState *state, uint64_t pc);
+	void onMemoryWrite(S2EExecutionState *state, uint64_t pc);
 
 };
 
@@ -32,7 +34,6 @@ public:
     MemoryAnalysisState() {}
 
     ~MemoryAnalysisState() {}
-
 
     static PluginState * factory(Plugin*, S2EExecutionState*) {
         return new MemoryAnalysisState();

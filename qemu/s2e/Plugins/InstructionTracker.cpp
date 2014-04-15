@@ -8,18 +8,6 @@ namespace plugins {
 //The plugin does not have any dependency.
 S2E_DEFINE_PLUGIN(InstructionTracker, "Tutorial - Tracking instructions", "InstructionTracker",);
 
-void InstructionTracker::initialize(){}
-
-void InstructionTracker::onTranslateInstruction(ExecutionSignal *signal,
-												S2EExecutionState *state,
-												TranslationBlock *tb,
-												uint64_t pc);
-
-void InstructionTracker::onInstructionExecution(S2EExecutionState *state, uint64_t pc)
-
-} // namespace plugins
-} // namespace s2e
-
 void InstructionTracker::initialize()
 {
     m_address = (uint64_t) s2e()->getConfig()->getInt(getConfigKey() + ".addressToTrack");
@@ -54,3 +42,7 @@ void InstructionTracker::onInstructionExecution(S2EExecutionState *state, uint64
     //Plugins can also call the s2e() method to use the S2E API.
 	plgState->increment();
 }
+
+} // namespace plugins
+} // namespace s2e
+

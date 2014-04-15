@@ -18,10 +18,49 @@ extern "C" {
 namespace s2e {
 namespace Plugins {
 
-S2E_DEFINE_PLUGIN(MemoryAnalysis, "Memory Analysis Plugin", "",);
+S2E_DEFINE_PLUGIN(MemoryAnalysis, "Memory Analysis Plugin", "SyscallMonitor", "LibcallMonitor", "InstructionMonitor");
 
-void MemoryAnalysis::initialize(){}
+/*********************************************************************************
+ *	initialize the shadown memory
+ *********************************************************************************/
+void MemoryAnalysis::initialize(){
+	
+}
 
+/*********************************************************************************
+ *	update the memory shadow based on the loaded module.	
+ *********************************************************************************/
+void onModuleLoad(){
+
+}
+
+/*********************************************************************************
+ *	
+ *********************************************************************************/
+void onMemoryWrite(){
+
+}
+
+/*********************************************************************************
+ *	obtained the data type from system call parameters	
+ *********************************************************************************/
+void onSyscallTypeSink(){
+
+}
+
+/*********************************************************************************
+ *	obtained the data type from system call parameters	
+ *********************************************************************************/
+void onLibcallTypeSink(){
+
+}
+
+/*********************************************************************************
+ *	obtained the data type from system call parameters	
+ *********************************************************************************/
+void onInstructionTypeSink(){
+
+}
 
 } //namespace plugins 
 } //namespace s2e
