@@ -26,7 +26,7 @@ Other than the event based mechanism, we also should take care of the s2e custom
 <a name="MemoryAnalysis.cpp" />
 ## MemoryAnalysis.cpp
 
-This file will implement the taint propagation when maintain a shadown memory data structure. The shadow memory is implemented in [shadow_mem.cpp](#shadow_mem.cpp)
+This file will implement the taint propagation when maintain a shadown memory data structure. The shadow memory is implemented in [shadow_mem.cpp](#shadow_mem.cpp), which is borrowed from Rewards implementation.
 
 <a name="SyscallMonitor.cpp" />
 ## SyscallMonitor.cpp
