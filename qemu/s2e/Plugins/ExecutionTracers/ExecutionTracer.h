@@ -90,7 +90,6 @@ private:
 
     void onProcessFork(bool preFork, bool isChild, unsigned parentProcId);
 
-
 };
 
 #if 0

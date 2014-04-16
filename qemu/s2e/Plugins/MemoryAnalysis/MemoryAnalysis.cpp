@@ -24,7 +24,8 @@ S2E_DEFINE_PLUGIN(MemoryAnalysis, "Memory Analysis Plugin", "SyscallMonitor", "L
  *	initialize the shadown memory
  *********************************************************************************/
 void MemoryAnalysis::initialize(){
-	
+	init_shadow_memory();	
+
 }
 
 /*********************************************************************************
