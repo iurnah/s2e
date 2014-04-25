@@ -5,14 +5,14 @@
  *      Author: Rui Han
  */
 
-extern "C" {
-#include <qemu-common.h>
-}
+#include <iomanip>
+#include <inttypes.h>
 
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutionState.h>
-#include <s2e/Plugins/CorePlugin.h>
-//#include <s2e/Plugins/InterruptMonitor.h>
+#include <s2e/S2EExecutor.h>
+#include <s2e/ConfigFile.h>
+#include <s2e/Utils.h>
 #include "MemoryAnalyzer.h"
 
 namespace s2e {

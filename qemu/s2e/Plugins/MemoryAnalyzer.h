@@ -15,7 +15,7 @@ class MemoryAnalyzer: public Plugin
 	S2E_PLUGIN
 private:
 	ExecutionTracer *m_tracer;
-	ModuleExecutionDetector *m_executionDetector
+	ModuleExecutionDetector *m_executionDetector;
 
 	bool m_monitorModules;
 	bool m_memoryMonitor;
@@ -27,7 +27,7 @@ private:
 public:
 	MemoryAnalyzer(S2E *s2e): Plugin(s2e) {	}
 	//probably we need more customized signals in future
-	sigc::signal<void, S2EExecutionState *, uint64_t> ;
+	//sigc::signal<void, S2EExecutionState *, uint64_t> ;
 	
 	void initialize();
 	void enableTracing();
@@ -45,7 +45,7 @@ public:
 	void traceDataMemoryAccess(S2EExecutionState *state,
 								klee::ref<klee::Expr> &address,
 								klee::ref<klee::Expr> &hostAddress,
-								klee::ref<klee::Expr> &value
+								klee::ref<klee::Expr> &value,
 								bool isWrite, bool isIO);
 
 };
