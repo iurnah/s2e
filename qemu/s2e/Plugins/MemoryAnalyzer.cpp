@@ -12,8 +12,8 @@ extern "C" {
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutionState.h>
 #include <s2e/Plugins/CorePlugin.h>
-#include <s2e/Plugins/InterruptMonitor.h>
-#include <s2e/Plugins/MemoryAnalyzer/MemoryAnalyzer.h>
+//#include <s2e/Plugins/InterruptMonitor.h>
+#include "MemoryAnalyzer.h"
 
 namespace s2e {
 namespace Plugins {
