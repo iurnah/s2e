@@ -80,7 +80,6 @@ void ExecutionTracer::createNewTraceFile(bool append)
     }else {
         m_fileName = s2e()->getOutputFilename("ExecutionTracer.dat");
         m_LogFile = fopen(m_fileName.c_str(), "wb");
-        //m_LogFile = fopen(m_fileName.c_str(), "w");
     }
 
     if (!m_LogFile) {
