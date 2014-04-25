@@ -15,6 +15,8 @@
 #include <s2e/Utils.h>
 #include "MemoryAnalyzer.h"
 
+#include <llvm/Support/CommandLine.h>
+
 namespace s2e {
 namespace plugins {
 
@@ -32,30 +34,30 @@ void MemoryAnalyzer::initialize(){
 	m_executionDetector = static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));
 
 	m_monitorModules = s2e()->getConfig()->getBool(getConfigKey() + ".monitorModules");
-	if (m_monitorModules && !m_execDetector) {
+	if (m_monitorModules && !m_executionDetector) {
 		s2e()->getWarningsStream() << "MemoryAnalyzer: The monitorModule option requires ModuleExecutionDetector\n";
 		exit(-1);
 	}
 
 	m_memoryMonitor = s2e()->getConfig()->getBool(getConfigKey() + ".memoryMonitor");
 	m_stackMonitor = s2e()->getConfig()->getBool(getConfigKey() + ".stackMonitor");
-	m_heapMonitor = s2e()-getConfig()->getBool(getConfigKey() + ".heapMonitor");
+	m_heapMonitor = s2e()->getConfig()->getBool(getConfigKey() + ".heapMonitor");
 
-	s2e()->getDebugStream() << "MonitorMemory: " << m_monitorMemory << "StackMonitor" 
+	s2e()->getDebugStream() << "MonitorMemory: " << m_memoryMonitor << "StackMonitor" 
 			<< m_stackMonitor << "HeapMonitor" << m_heapMonitor << std::endl;
 
 	enableTracing();
 
 	/* Initialize the shadow memory */
-	init_shadow_memory();	
+	//init_shadow_memory();	
 }
 
 /*********************************************************************************
  *	
  *********************************************************************************/
 void MemoryAnalyzer::enableTracing(){
-	if(m_monitorMemory){
-		s2e()->getMessagesStream() << "MemoryAnalyzer Plugin: Enable memory tracing" << std::endl;
+	if(m_memoryMonitor){
+		s2e()->getMessagesStream() << "MemoryAnalyzer Plugin: Enable memory tracing" << "\n";
 		m_DataMemoryMonitor.disconnect();
 		
 		if(m_monitorModules){
@@ -63,7 +65,7 @@ void MemoryAnalyzer::enableTracing(){
 			m_executionDetector->onModuleTransition.connect(	//handle the module detection
 					sigc::mem_fun(*this, &MemoryAnalyzer::onModuleTransition));
 		} else {
-			m_DatamemoryMonitor = s2e()->getCorePlugin()->onDataMemoryAccess.connect(
+			m_DataMemoryMonitor = s2e()->getCorePlugin()->onDataMemoryAccess.connect(
 					sigc::mem_fun(*this, &MemoryAnalyzer::onDataMemoryAccess));
 		}
 	}
@@ -76,9 +78,9 @@ void MemoryAnalyzer::onModuleTransition(S2EExecutionState *state,
 										const ModuleDescriptor *prevModule,
 										const ModuleDescriptor *nextModule)
 {
-	ModuleDescriptor *currentDescriptor = m_executionDetector->getCurrentDescriptor(state);
+	const ModuleDescriptor *currentDescriptor = m_executionDetector->getCurrentDescriptor(state);
 
-	if(currentDescriptor->name == nextModule->name && !m_DataMomoryMonitor.connect()){
+	if(currentDescriptor->Name == nextModule->Name && !m_DataMemoryMonitor.connected()){
 		m_DataMemoryMonitor = s2e()->getCorePlugin()->onDataMemoryAccess.connect(
 				sigc::mem_fun(*this, &MemoryAnalyzer::onDataMemoryAccess));		
 	} else {
@@ -104,7 +106,7 @@ void MemoryAnalyzer::onDataMemoryAccess(S2EExecutionState *state,
 void MemoryAnalyzer::traceDataMemoryAccess(S2EExecutionState *state,
 								klee::ref<klee::Expr> &address,
 								klee::ref<klee::Expr> &hostAddress,
-								klee::ref<klee::Expr> &value
+								klee::ref<klee::Expr> &value,
 								bool isWrite, bool isIO)
 {
 	bool isAddrCste = isa<klee::ConstantExpr>(address);

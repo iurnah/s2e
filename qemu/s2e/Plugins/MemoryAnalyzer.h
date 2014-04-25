@@ -25,9 +25,7 @@ private:
 	sigc::connection m_DataMemoryMonitor;
 
 public:
-	MemoryAnalyzer(S2E *s2e): Plugin(s2e) {	}
-	//probably we need more customized signals in future
-	//sigc::signal<void, S2EExecutionState *, uint64_t> ;
+	MemoryAnalyzer(S2E *s2e);
 	
 	void initialize();
 	void enableTracing();
