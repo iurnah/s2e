@@ -78,7 +78,7 @@ void ExecutionTracer::createNewTraceFile(bool append)
         assert(m_fileName.size() > 0);
         m_LogFile = fopen(m_fileName.c_str(), "a");
     }else {
-        m_fileName = s2e()->getOutputFilename("ExecutionTracer.dat");
+        m_fileName = s2e()->getOutputFilename("ExecutionTracer_Rui.dat");
         //m_LogFile = fopen(m_fileName.c_str(), "wb");
         m_LogFile = fopen(m_fileName.c_str(), "w");
     }
