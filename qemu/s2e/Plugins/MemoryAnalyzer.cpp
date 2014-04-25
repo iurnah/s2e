@@ -16,7 +16,7 @@
 #include "MemoryAnalyzer.h"
 
 namespace s2e {
-namespace Plugins {
+namespace plugins {
 
 S2E_DEFINE_PLUGIN(MemoryAnalyzer, "Memory Analyzer Plugin", "MemoryAnalyzer", "ExecutionTracer");
 
