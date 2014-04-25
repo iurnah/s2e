@@ -44,7 +44,7 @@ void MemoryAnalyzer::initialize(){
 	m_heapMonitor = s2e()->getConfig()->getBool(getConfigKey() + ".heapMonitor");
 
 	s2e()->getDebugStream() << "MonitorMemory: " << m_memoryMonitor << "StackMonitor" 
-			<< m_stackMonitor << "HeapMonitor" << m_heapMonitor << std::endl;
+			<< m_stackMonitor << "HeapMonitor" << m_heapMonitor << '\n';
 
 	enableTracing();
 
@@ -57,7 +57,7 @@ void MemoryAnalyzer::initialize(){
  *********************************************************************************/
 void MemoryAnalyzer::enableTracing(){
 	if(m_memoryMonitor){
-		s2e()->getMessagesStream() << "MemoryAnalyzer Plugin: Enable memory tracing" << "\n";
+		s2e()->getMessagesStream() << "MemoryAnalyzer Plugin: Enable memory tracing" << '\n';
 		m_DataMemoryMonitor.disconnect();
 		
 		if(m_monitorModules){
@@ -135,7 +135,7 @@ void MemoryAnalyzer::traceDataMemoryAccess(S2EExecutionState *state,
 	e.value = isValCste ? cast<klee::ConstantExpr>(value)->getZExtValue(64) : concreteValue;
 	e.size = klee::Expr::getMinBytesForWidth(value->getWidth());
 	e.flags = isWrite*EXECTRACE_MEM_WRITE | isIO*EXECTRACE_MEM_IO;
-	e.hostAddress = isHostAddrCste ? case<klee::ConstantExpr>(hostAddress)->getZExtValue(64) : 0xDEADBEEF;
+	e.hostAddress = isHostAddrCste ? cast<klee::ConstantExpr>(hostAddress)->getZExtValue(64) : 0xDEADBEEF;
 
 	if(!isAddrCste){
 		e.flags |= EXECTRACE_MEM_SYMBADDR;
@@ -160,30 +160,6 @@ void MemoryAnalyzer::traceDataMemoryAccess(S2EExecutionState *state,
 /*********************************************************************************
  *	
  *********************************************************************************/
-void onMemoryWrite(){
-
-}
-
-/*********************************************************************************
- *	obtained the data type from system call parameters	
- *********************************************************************************/
-void onSyscallTypeSink(){
-
-}
-
-/*********************************************************************************
- *	obtained the data type from system call parameters	
- *********************************************************************************/
-void onLibcallTypeSink(){
-
-}
-
-/*********************************************************************************
- *	obtained the data type from system call parameters	
- *********************************************************************************/
-void onInstructionTypeSink(){
-
-}
 
 } //namespace plugins 
 } //namespace s2e
