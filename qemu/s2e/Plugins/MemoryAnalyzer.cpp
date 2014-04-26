@@ -41,7 +41,7 @@
 #include <s2e/S2EExecutor.h>
 #include <s2e/ConfigFile.h>
 #include <s2e/Utils.h>
-#include "MemoryTracer.h"
+#include "MemoryAnalyzer.h"
 
 #include <llvm/Support/CommandLine.h>
 
@@ -50,15 +50,15 @@ extern llvm::cl::opt<bool> ConcolicMode;
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(MemoryTracer, "Memory tracer plugin", "MemoryTracer", "ExecutionTracer");
+S2E_DEFINE_PLUGIN(MemoryAnalyzer, "MemoryAnalyzer plugin", "MemoryAnalyzer", "ExecutionTracer");
 
-MemoryTracer::MemoryTracer(S2E* s2e)
+MemoryAnalyzer::MemoryAnalyzer(S2E* s2e)
         : Plugin(s2e)
 {
 
 }
 
-void MemoryTracer::initialize()
+void MemoryAnalyzer::initialize()
 {
 
     m_tracer = static_cast<ExecutionTracer*>(s2e()->getPlugin("ExecutionTracer"));
@@ -67,7 +67,7 @@ void MemoryTracer::initialize()
     //Retrict monitoring to configured modules only
     m_monitorModules = s2e()->getConfig()->getBool(getConfigKey() + ".monitorModules");
     if (m_monitorModules && !m_execDetector) {
-        s2e()->getWarningsStream() << "MemoryTracer: The monitorModules option requires ModuleExecutionDetector\n";
+        s2e()->getWarningsStream() << "MemoryAnalyzer: The monitorModules option requires ModuleExecutionDetector\n";
         exit(-1);
     }
 
@@ -102,16 +102,16 @@ void MemoryTracer::initialize()
 
     if (hasTimeTrigger) {
         m_timerConnection = s2e()->getCorePlugin()->onTimer.connect(
-                sigc::mem_fun(*this, &MemoryTracer::onTimer));
+                sigc::mem_fun(*this, &MemoryAnalyzer::onTimer));
     } else if (manualMode) {
         s2e()->getCorePlugin()->onCustomInstruction.connect(
-                sigc::mem_fun(*this, &MemoryTracer::onCustomInstruction));
+                sigc::mem_fun(*this, &MemoryAnalyzer::onCustomInstruction));
     } else {
         enableTracing();
     }
 }
 
-void MemoryTracer::traceDataMemoryAccess(S2EExecutionState *state,
+void MemoryAnalyzer::traceDataMemoryAccess(S2EExecutionState *state,
                                klee::ref<klee::Expr> &address,
                                klee::ref<klee::Expr> &hostAddress,
                                klee::ref<klee::Expr> &value,
@@ -187,7 +187,7 @@ void MemoryTracer::traceDataMemoryAccess(S2EExecutionState *state,
     m_tracer->writeData(state, &e, sizeof(e), TRACE_MEMORY);
 }
 
-void MemoryTracer::onDataMemoryAccess(S2EExecutionState *state,
+void MemoryAnalyzer::onDataMemoryAccess(S2EExecutionState *state,
                                klee::ref<klee::Expr> address,
                                klee::ref<klee::Expr> hostAddress,
                                klee::ref<klee::Expr> value,
@@ -203,14 +203,14 @@ void MemoryTracer::onDataMemoryAccess(S2EExecutionState *state,
     traceDataMemoryAccess(state, address, hostAddress, value, isWrite, isIO);
 }
 
-void MemoryTracer::onModuleTransition(S2EExecutionState *state,
+void MemoryAnalyzer::onModuleTransition(S2EExecutionState *state,
                                        const ModuleDescriptor *prevModule,
                                        const ModuleDescriptor *nextModule)
 {
     if (nextModule && !m_memoryMonitor.connected()) {
         m_memoryMonitor =
             s2e()->getCorePlugin()->onDataMemoryAccess.connect(
-                sigc::mem_fun(*this, &MemoryTracer::onDataMemoryAccess)
+                sigc::mem_fun(*this, &MemoryAnalyzer::onDataMemoryAccess)
             );
     } else {
         m_memoryMonitor.disconnect();
@@ -218,7 +218,7 @@ void MemoryTracer::onModuleTransition(S2EExecutionState *state,
 }
 
 
-void MemoryTracer::onTlbMiss(S2EExecutionState *state, uint64_t addr, bool is_write)
+void MemoryAnalyzer::onTlbMiss(S2EExecutionState *state, uint64_t addr, bool is_write)
 {
     ExecutionTraceTlbMiss e;
     e.pc = state->getPc();
@@ -228,7 +228,7 @@ void MemoryTracer::onTlbMiss(S2EExecutionState *state, uint64_t addr, bool is_wr
     m_tracer->writeData(state, &e, sizeof(e), TRACE_TLBMISS);
 }
 
-void MemoryTracer::onPageFault(S2EExecutionState *state, uint64_t addr, bool is_write)
+void MemoryAnalyzer::onPageFault(S2EExecutionState *state, uint64_t addr, bool is_write)
 {
     ExecutionTracePageFault e;
     e.pc = state->getPc();
@@ -238,46 +238,46 @@ void MemoryTracer::onPageFault(S2EExecutionState *state, uint64_t addr, bool is_
     m_tracer->writeData(state, &e, sizeof(e), TRACE_PAGEFAULT);
 }
 
-void MemoryTracer::enableTracing()
+void MemoryAnalyzer::enableTracing()
 {
     if (m_monitorMemory) {
-        s2e()->getMessagesStream() << "MemoryTracer Plugin: Enabling memory tracing" << '\n';
+        s2e()->getMessagesStream() << "MemoryAnalyzer Plugin: Enabling memory tracing" << '\n';
         m_memoryMonitor.disconnect();
 
         if (m_monitorModules) {
             m_execDetector->onModuleTransition.connect(
                     sigc::mem_fun(*this,
-                            &MemoryTracer::onModuleTransition)
+                            &MemoryAnalyzer::onModuleTransition)
                     );
         } else {
             m_memoryMonitor = s2e()->getCorePlugin()->onDataMemoryAccess.connect(
-                    sigc::mem_fun(*this, &MemoryTracer::onDataMemoryAccess));
+                    sigc::mem_fun(*this, &MemoryAnalyzer::onDataMemoryAccess));
         }
     }
 
     if (m_monitorPageFaults) {
-        s2e()->getMessagesStream() << "MemoryTracer Plugin: Enabling page fault tracing" << '\n';
+        s2e()->getMessagesStream() << "MemoryAnalyzer Plugin: Enabling page fault tracing" << '\n';
         m_pageFaultsMonitor.disconnect();
         m_pageFaultsMonitor = s2e()->getCorePlugin()->onPageFault.connect(
-                sigc::mem_fun(*this, &MemoryTracer::onPageFault));
+                sigc::mem_fun(*this, &MemoryAnalyzer::onPageFault));
     }
 
     if (m_monitorTlbMisses) {
-        s2e()->getMessagesStream() << "MemoryTracer Plugin: Enabling TLB miss tracing" << '\n';
+        s2e()->getMessagesStream() << "MemoryAnalyzer Plugin: Enabling TLB miss tracing" << '\n';
         m_tlbMissesMonitor.disconnect();
         m_tlbMissesMonitor = s2e()->getCorePlugin()->onTlbMiss.connect(
-                sigc::mem_fun(*this, &MemoryTracer::onTlbMiss));
+                sigc::mem_fun(*this, &MemoryAnalyzer::onTlbMiss));
     }
 }
 
-void MemoryTracer::disableTracing()
+void MemoryAnalyzer::disableTracing()
 {
     m_memoryMonitor.disconnect();
     m_pageFaultsMonitor.disconnect();
     m_tlbMissesMonitor.disconnect();
 }
 
-void MemoryTracer::onTimer()
+void MemoryAnalyzer::onTimer()
 {
     if (m_elapsedTics++ < m_timeTrigger) {
         return;
@@ -288,7 +288,7 @@ void MemoryTracer::onTimer()
     m_timerConnection.disconnect();
 }
 
-void MemoryTracer::onCustomInstruction(S2EExecutionState* state, uint64_t opcode)
+void MemoryAnalyzer::onCustomInstruction(S2EExecutionState* state, uint64_t opcode)
 {
     if (!OPCODE_CHECK(opcode, MEMORY_TRACER_OPCODE)) {
         return;
@@ -296,7 +296,7 @@ void MemoryTracer::onCustomInstruction(S2EExecutionState* state, uint64_t opcode
 
     uint64_t subfunction = OPCODE_GETSUBFUNCTION(opcode);
 
-    MemoryTracerOpcodes opc = (MemoryTracerOpcodes)subfunction;
+    MemoryAnalyzerOpcodes opc = (MemoryAnalyzerOpcodes)subfunction;
     switch(opc) {
     case Enable:
         enableTracing();
@@ -307,7 +307,7 @@ void MemoryTracer::onCustomInstruction(S2EExecutionState* state, uint64_t opcode
         break;
 
     default:
-        s2e()->getWarningsStream() << "MemoryTracer: unsupported opcode " << hexval(opc) << '\n';
+        s2e()->getWarningsStream() << "MemoryAnalyzer: unsupported opcode " << hexval(opc) << '\n';
         break;
     }
 

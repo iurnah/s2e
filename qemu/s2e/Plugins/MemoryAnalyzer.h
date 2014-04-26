@@ -47,18 +47,18 @@ namespace plugins{
 
 
 /** Handler required for KLEE interpreter */
-class MemoryTracer : public Plugin
+class MemoryAnalyzer : public Plugin
 {
     S2E_PLUGIN
 
 private:
 
 public:
-    MemoryTracer(S2E* s2e);
+    MemoryAnalyzer(S2E* s2e);
 
     void initialize();
 
-    enum MemoryTracerOpcodes {
+    enum MemoryAnalyzerOpcodes {
         Enable = 0,
         Disable = 1
     };
