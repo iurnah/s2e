@@ -50,7 +50,7 @@ extern llvm::cl::opt<bool> ConcolicMode;
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(MemoryAnalyzer, "MemoryAnalyzer plugin", "MemoryAnalyzer", "ExecutionTracer");
+S2E_DEFINE_PLUGIN(MemoryAnalyzer, "Memory Analyzer plugin", "MemoryAnalyzer", "ExecutionTracer");
 
 MemoryAnalyzer::MemoryAnalyzer(S2E* s2e)
         : Plugin(s2e)
