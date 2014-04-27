@@ -17,6 +17,8 @@ extern "C" {
 #include "InterruptMonitor.h"
 #include <s2e/Utils.h>
 
+#define R_ESP 4;
+
 using std::vector;
 using std::map;
 
