@@ -12,8 +12,6 @@
 #include "CorePlugin.h"
 #include "InterruptMonitor.h"
 
-#include "ModuleExecutionDetector.h"   //add by sun
-
 #include <vector>
 #include <map>
 

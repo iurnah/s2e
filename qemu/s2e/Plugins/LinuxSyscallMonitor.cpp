@@ -14,7 +14,6 @@ extern "C" {
 #include "CorePlugin.h"
 #include "LinuxSyscallMonitor.h"
 #include "InterruptMonitor.h"
-#include <s2e/Utils.h>
 
 namespace s2e {
 namespace plugins {
