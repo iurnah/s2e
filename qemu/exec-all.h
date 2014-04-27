@@ -168,13 +168,14 @@ enum ETranslationBlockType
     TB_DEFAULT=0,
     TB_JMP, TB_JMP_IND,
     TB_COND_JMP, TB_COND_JMP_IND,
-    TB_CALL, TB_CALL_IND, TB_REP, TB_RET
+    TB_CALL, TB_CALL_IND, TB_REP, TB_RET,
+    TB_INTERRUPT, TB_SYSENTER, TB_SYSEXIT
 };
 
 #ifdef CONFIG_S2E
 enum JumpType
 {
-    JT_RET, JT_LRET
+    JT_RET, JT_LRET, JT_IRET
 };
 #endif
 
