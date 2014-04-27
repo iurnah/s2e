@@ -6,18 +6,16 @@
  */
 
 extern "C" {
-#include "qemu-common.h"
+#include <qemu-common.h>
 }
 
 #include <vector>
 #include <map>
 
 #include <s2e/S2E.h>
-#include "CorePlugin.h"
-#include "InterruptMonitor.h"
-#include <s2e/Utils.h>
+#include <s2e/Plugins/CorePlugin.h>
+#include <s2e/Plugins/InterruptMonitor.h>
 
-#define R_ESP 4;
 
 using std::vector;
 using std::map;
@@ -84,13 +82,13 @@ void InterruptMonitor::onInterruptReturn(S2EExecutionState* state, uint64_t pc)
 
 	if (!state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_ESP]), &esp, sizeof(esp)))
 	{
-		s2e()->getWarningsStream() << "IRET has symbolic ESP register at 0x" << hexval(pc) << '\n';
+		s2e()->getWarningsStream() << "IRET has symbolic ESP register at 0x" << std::hex << pc << std::endl;
 	}
 
 	if (!state->readMemoryConcrete(esp, &eip, sizeof(eip), S2EExecutionState::VirtualAddress))
 	{
-		s2e()->getWarningsStream() << "IRET at 0x" << hexval(pc) << " has symbolic EIP value at memory address 0x" <<
-				hexval(esp) << '\n';
+		s2e()->getWarningsStream() << "IRET at 0x" << std::hex << pc << " has symbolic EIP value at memory address 0x" <<
+				std::hex << esp << std::endl;
 	}
 
 
@@ -101,7 +99,7 @@ void InterruptMonitor::onInterruptReturn(S2EExecutionState* state, uint64_t pc)
 		if (itr->second.empty())
 		{
 			s2e()->getWarningsStream() << "Vector of signals was empty when trying to find interrupt for IRET to 0x" <<
-					hexval(eip) << '\n';
+					std::hex << eip << std::endl;
 		}
 		else
 		{
@@ -129,7 +127,7 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 
 	if (!state->readMemoryConcrete(pc, &insnByte, 1))
 	{
-		s2e()->getWarningsStream() << "Could not read interrupt instruction at 0x" << hexval(pc) << '\n';// << std::dec << '\n';
+		s2e()->getWarningsStream() << "Could not read interrupt instruction at 0x" << std::hex << pc << std::dec << std::endl;
 		return;
 	}
 
@@ -143,7 +141,7 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 
 		if (!state->readMemoryConcrete(pc + 1, &intNumByte, 1))
 		{
-			s2e()->getWarningsStream() << "Could not read interrupt index at 0x" << hexval(pc)<< '\n';// << std::dec << '\n';
+			s2e()->getWarningsStream() << "Could not read interrupt index at 0x" << std::hex << pc << std::dec << std::endl;
 			return;
 		}
 
@@ -152,8 +150,8 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	else
 	{
 		/* Invalid Opcode */
-		s2e()->getWarningsStream() << "Unexpected opcode 0x" << hexval((unsigned int) insnByte) << " at 0x" <<
-				hexval(pc) << ", expected 0xcc or 0xcd" << '\n';//std::dec << '\n';
+		s2e()->getWarningsStream() << "Unexpected opcode 0x" << std::hex << (unsigned int) insnByte << " at 0x" <<
+				pc << ", expected 0xcc or 0xcd" << std::dec << std::endl;
 		return;
 	}
 
