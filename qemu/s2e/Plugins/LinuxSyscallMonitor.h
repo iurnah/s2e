@@ -11,6 +11,7 @@
 #include <s2e/Plugin.h>
 #include "CorePlugin.h"
 #include "InterruptMonitor.h"
+#include "ModuleExecutionDetector.h"
 
 #include <vector>
 #include <map>
