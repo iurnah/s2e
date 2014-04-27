@@ -6,20 +6,29 @@
  */
 
 extern "C" {
-#include <qemu-common.h>
+#include "qemu-common.h"
 }
 
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutionState.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/Plugins/LinuxSyscallMonitor.h>
-#include <s2e/Plugins/InterruptMonitor.h>
+#include "CorePlugin.h"
+#include "LinuxSyscallMonitor.h"
+#include <s2e/Utils.h>
+
+#define R_EAX 0
+#define R_ECX 1
+#define R_EDX 2
+#define R_EBX 3
+#define R_ESP 4
+#define R_EBP 5
+#define R_ESI 6
+#define R_EDI 7
 
 
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(LinuxSyscallMonitor, "Linux syscall monitoring plugin", "",);
+S2E_DEFINE_PLUGIN(LinuxSyscallMonitor, "Linux syscall monitoring plugin", " ",);  //add by sun for special module
 
 static const int TP = 0x1;
 static const int TD = 0x2;
@@ -28,6 +37,7 @@ static const int NF = 0x8;
 static const int TN = 0x10;
 static const int TI = 0x20;
 static const int TS = 0x40;
+
 
 LinuxSyscallMonitor::SyscallInformation LinuxSyscallMonitor::m_syscallInformation[] = {
 #include "syscallent-simple.h"
@@ -44,10 +54,24 @@ LinuxSyscallMonitor::~LinuxSyscallMonitor() {
 
 void LinuxSyscallMonitor::initialize()
 {
-	s2e()->getCorePlugin()->onTranslateBlockEnd.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateBlockEnd));
-//	s2e()->getCorePlugin()->onTranslateJumpStart.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateJumpStart));
 
+	s2e()->getCorePlugin()->onTranslateBlockEnd.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateBlockEnd));
+	m_detector = static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));  // add by sun for special module
+//	s2e()->getCorePlugin()->onTranslateJumpStart.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateJumpStart));
+	m_detector->onModuleLoad.connect(
+		sigc::mem_fun(*this,
+					  &LinuxSyscallMonitor::onModuleLoad)
+	);     //add by sun for special module
 	m_initialized = false;
+}
+
+/* add by sun for specail module */
+void LinuxSyscallMonitor::onModuleLoad(
+	S2EExecutionState* state,
+	const ModuleDescriptor &module
+)
+{
+	spe_pid = module.Pid;
 }
 
 void LinuxSyscallMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
@@ -58,14 +82,13 @@ void LinuxSyscallMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
 	if (!m_initialized)
 	{
 		Plugin* intMonPlugin = s2e()->getPlugin("InterruptMonitor");
-
 		if (intMonPlugin)
 		{
 			reinterpret_cast<InterruptMonitor *>(intMonPlugin)->getInterruptSignal(state, 0x80).connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onInt80));
 		}
 		else
 		{
-			s2e()->getWarningsStream() << "InterruptMonitor plugin missing. Cannot monitor syscalls via int 0x80" << std::endl;
+			s2e()->getWarningsStream() << "InterruptMonitor plugin missing. Cannot monitor syscalls via int 0x80" << '\n';
 		}
 
 		m_initialized = true;
@@ -79,10 +102,13 @@ void LinuxSyscallMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
 	{
 		signal->connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onSysexit));
 	}
+
+	//m_detector = static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));
 }
 
 void LinuxSyscallMonitor::onSysenter(S2EExecutionState* state, uint64_t pc)
 {
+	//s2e()->getWarningsStream() << "onSysenter "<< "'\n";
 	target_ulong ebp = 0;
 	target_ulong eip = 0;
 
@@ -103,17 +129,18 @@ void LinuxSyscallMonitor::onSysenter(S2EExecutionState* state, uint64_t pc)
 	//page at 0xffff4000, and SYSEXIT always returns to after this instruction.
 	if (!state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EBP]), &ebp, sizeof(ebp)))
 	{
-		s2e()->getWarningsStream() << "SYSENTER has symbolic EBP value at 0x" << std::hex << pc << std::endl;
+		s2e()->getWarningsStream() << "SYSENTER has symbolic EBP value at 0x" << hexval(pc) << '\n';
 	}
 
 	if (!state->readMemoryConcrete(ebp + 12, &eip, sizeof(eip), S2EExecutionState::VirtualAddress))
 	{
-		s2e()->getWarningsStream() << "SYSENTER has symbolic EIP value at 0x" << std::hex << pc << std::endl;
+		s2e()->getWarningsStream() << "SYSENTER has symbolic EIP value at 0x" << hexval(pc) << '\n';
 	}
 
 
 	plgState->m_returnSignals[eip].push_back(SyscallReturnSignal());
 
+	//s2e()->getWarningsStream() << m_returnSignals << '\n';
 
 //	s2e()->getDebugStream() << "SYSENTER return address 0x" << std::hex << eip << std::endl;
 	emitSyscallSignal(state, pc, SYSCALL_SYSENTER, plgState->m_returnSignals[eip].back());
@@ -128,12 +155,12 @@ void LinuxSyscallMonitor::onSysexit(S2EExecutionState* state, uint64_t pc)
 
 	if (!state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_ECX]), &esp, sizeof(esp)))
 	{
-		s2e()->getWarningsStream() << "SYSEXIT has symbolic EBP at 0x" << std::hex << pc << std::endl;
+		s2e()->getWarningsStream() << "SYSEXIT has symbolic EBP at 0x" << hexval(pc) << '\n';
 	}
 
 	if (!state->readMemoryConcrete(esp + 12, &eip, sizeof(eip), S2EExecutionState::VirtualAddress))
 	{
-		s2e()->getWarningsStream() << "SYSEXIT has symbolic return address at 0x" << std::hex << pc << std::endl;
+		s2e()->getWarningsStream() << "SYSEXIT has symbolic return address at 0x" << hexval(pc) << '\n';
 	}
 
 	SyscallReturnSignalsMap::iterator itr = plgState->m_returnSignals.find(eip);
@@ -157,7 +184,7 @@ void LinuxSyscallMonitor::onInt80(S2EExecutionState* state, uint64_t pc, int int
 	}
 	else
 	{
-		s2e()->getDebugStream() << "LinuxSyscallMonitor received interrupt signal from InterruptMonitor that was not int 0x80" << std::endl;
+		s2e()->getDebugStream() << "LinuxSyscallMonitor received interrupt signal from InterruptMonitor that was not int 0x80" << '\n';
 	}
 }
 
@@ -192,15 +219,47 @@ LinuxSyscallMonitor::SyscallSignal& LinuxSyscallMonitor::getSyscallSignal(S2EExe
 
 void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t pc, SyscallType syscall_type, SyscallReturnSignal& signal)
 {
+	// add by sun for track configured modules
+	//Only track configured modules
+    //uint64_t caller = state->getTb()->pcOfLastInstr;
+    //const ModuleDescriptor *mod = m_detector->getModule(state, caller);
+    //if (!mod) {
+    //    return;
+    //}
+	//add by sun track configured modules
+
 	uint32_t eax = 0xFFFFFFFF;
 	target_ulong cr3 = state->readCpuState(CPU_OFFSET(cr[3]), sizeof(target_ulong) * 8);
+	//state->readCpuState(CPU_OFFSET(cr[3]), sizeof(target_ulong) * 8);
 
 	DECLARE_PLUGINSTATE(LinuxSyscallMonitorState, state);
 
 	if (!state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EAX]), &eax, sizeof(eax)))
 	{
-		s2e()->getWarningsStream() << "Syscall with symbolic syscall number (EAX)!" << std::endl;
+		s2e()->getWarningsStream() << "Syscall with symbolic syscall number (EAX)!" << '\n';
 	}
+
+	struct X86State {
+	   uint32_t eax;
+	   uint32_t ebx;
+	   uint32_t ecx;
+	   uint32_t edx;
+	   uint32_t esi;
+	   uint32_t edi;
+	   uint32_t ebp;
+	   uint32_t esp;
+	   uint32_t eip;
+	   uint32_t cr2;
+	}s;
+
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EAX]), &(s.eax), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDX]), &(s.edx), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESI]), &(s.esi), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDI]), &(s.edi), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBP]), &(s.ebp), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESP]), &(s.esp), sizeof (uint32_t) );
 
 	if (eax != 0xFFFFFFFF)
 	{
@@ -213,10 +272,18 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 	}
 
 	plgState->m_allSyscallsSignal.emit(state, pc, syscall_type, eax, signal);
+	
+	//s2e()->getMessagesStream(state) << "20 "<< "'\n";
+    if (spe_pid && state->getPid() == spe_pid)
+		s2e()->getWarningsStream(state) << "0x" << hexval(pc)  << ": System call " << eax  << "/" <<
+			getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
+	s2e()->getDebugStream(state) << "0x" << hexval(pc)  << ": System call " << eax  << "/" <<
+		getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
+	//s2e()->getDebugStream (state) <<" eax:" << hexval(s.eax) << " ebx:" << hexval(s.ebx) << " ecx:" << hexval(s.ecx) << " edx:" << hexval(s.edx)<< " esi:" << hexval(s.esi) << " edi:" << hexval(s.edi) << " ebp:" << hexval(s.ebp) << " esp:" << hexval(s.esp) << "\n";
 
-//	s2e()->getDebugStream() << "0x" << std::hex << pc << ": System call 0x" << std::hex << eax << "/" <<
-//			getSyscallInformation(eax).name << " (" << syscall_type << ") in process " << std::hex <<
-//			cr3 << std::endl;
+    //s2e()->getMessagesStream(state) << "0x" << hexval(pc)  << ": System call 0x" << hexval(eax)  << "/" <<
+	//		getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
+	//s2e()->getMessagesStream(state) << "21 "<< "'\n";
 }
 
 

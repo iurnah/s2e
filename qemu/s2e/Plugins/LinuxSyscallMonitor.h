@@ -9,8 +9,9 @@
 #define SYSCALLMONITOR_H_
 
 #include <s2e/Plugin.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/Plugins/InterruptMonitor.h>
+#include "CorePlugin.h"
+#include "InterruptMonitor.h"
+#include "ModuleExecutionDetector.h"
 
 #include <vector>
 #include <map>
@@ -45,6 +46,9 @@ class LinuxSyscallMonitor : public Plugin
 {
 	S2E_PLUGIN
 public:
+	
+	int spe_pid; //add by sun for special module
+	
 	static const int MAX_SYSCALL_NR = 444;
 	enum ESyscallType {SYSCALL_INT, SYSCALL_SYSENTER, SYSCALL_SYSCALL};
 	struct SSyscallInformation
@@ -80,6 +84,11 @@ protected:
 private:
 	static SyscallInformation m_syscallInformation[];
 	bool m_initialized;
+	ModuleExecutionDetector *m_detector; //add by sun for track configured modules
+	void onModuleLoad(
+		S2EExecutionState* state,
+		const ModuleDescriptor &module
+	);  //add by sun for special modules
 
 };
 
