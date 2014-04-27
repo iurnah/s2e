@@ -16,6 +16,8 @@ extern "C" {
 #include "CorePlugin.h"
 #include "InterruptMonitor.h"
 #include <s2e/Utils.h>
+#include <s2e/S2EExecutionState.h>
+#include <InterruptMonitor.h>
 
 using std::vector;
 using std::map;

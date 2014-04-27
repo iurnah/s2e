@@ -48,7 +48,7 @@ class LinuxSyscallMonitor : public Plugin
 	S2E_PLUGIN
 public:
 	
-	int spe_pid = 0; //add by sun for special module
+	int spe_pid; //add by sun for special module
 	
 	static const int MAX_SYSCALL_NR = 444;
 	enum ESyscallType {SYSCALL_INT, SYSCALL_SYSENTER, SYSCALL_SYSCALL};
