@@ -15,16 +15,6 @@ extern "C" {
 #include "LinuxSyscallMonitor.h"
 #include <s2e/Utils.h>
 
-#define R_EAX 0
-#define R_ECX 1
-#define R_EDX 2
-#define R_EBX 3
-#define R_ESP 4
-#define R_EBP 5
-#define R_ESI 6
-#define R_EDI 7
-
-
 namespace s2e {
 namespace plugins {
 
