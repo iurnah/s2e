@@ -13,7 +13,7 @@ extern "C" {
 #include <map>
 
 #include <s2e/S2E.h>
-#include <s2e/Plugins/CorePlugin.h>
+//#include <s2e/Plugins/CorePlugin.h>
 #include <s2e/Plugins/InterruptMonitor.h>
 #include <s2e/Utils.h>
 
