@@ -13,11 +13,9 @@ extern "C" {
 #include <map>
 
 #include <s2e/S2E.h>
-#include "CorePlugin.h"
-#include "InterruptMonitor.h"
+#include <s2e/Plugins/CorePlugin.h>
+#include <s2e/Plugins/InterruptMonitor.h>
 #include <s2e/Utils.h>
-
-#define R_ESP 4;
 
 using std::vector;
 using std::map;
