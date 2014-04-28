@@ -455,6 +455,8 @@ s2eobj-arm-y =
 s2eobj-arm-y += s2e/Plugins/ArmFunctionMonitor.o
 
 s2eobj-i386-y =
+s2eobj-i386-y += s2e/Plugins/InterruptMonitor.o
+s2eobj-i386-y += s2e/Plugins/LinuxSyscallMonitor.o
 s2eobj-i386-y += s2e/Plugins/X86FunctionMonitor.o
 s2eobj-i386-y += s2e/Plugins/InterruptInjector.o
 s2eobj-i386-y += s2e/Plugins/X86ExceptionInterceptor.o
@@ -484,8 +486,6 @@ s2eobj-y += s2e/Plugin.o s2e/Plugins/CorePlugin.o s2e/Plugins/Example.o
 #s2eobj-y += s2e/Plugins/PluginInterface.o
 s2eobj-y += s2e/Plugins/ConsistencyModels.o
 # Modified begin
-s2eobj-y += s2e/Plugins/InterruptMonitor.o
-#s2eobj-y += s2e/Plugins/LinuxSyscallMonitor.o
 s2eobj-y += s2e/Plugins/ExecutionTracers/MemoryAnalyzer.o
 # Modified end
 s2eobj-y += s2e/Plugins/ExecutionTracers/ExecutionTracer.o
