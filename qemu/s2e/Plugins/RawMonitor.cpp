@@ -348,8 +348,8 @@ void RawMonitor::onTranslateInstructionStart(ExecutionSignal *signal,
 
     for (it = m_cfg.begin(); it != m_cfg.end(); ++it) {
         const Cfg &c = *it;
-		s2e()->getDebugStream() << "[onTIS] RawMonitor:" << c->name << " " << 
-				hexval(c->start) << ' ' << hexval(c->size) << '\n';
+		s2e()->getDebugStream() << "[onTIS] RawMonitor:" << c.name << " " << 
+				hexval(c.start) << ' ' << hexval(c.size) << '\n';
         loadModule(state, c, true);
     }
 
