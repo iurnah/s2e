@@ -187,7 +187,7 @@ void RawMonitor::opLoadConfiguredModule(S2EExecutionState *state)
     for (it = m_cfg.begin(); it != m_cfg.end(); ++it) {
         Cfg &c = *it;
         if (c.name == nameStr) {
-            s2e()->getMessagesStream() << "RawMonitor: Registering " << nameStr << " "
+            s2e()->getMessagesStream() << "[opLCModule] RawMonitor: Registering " << nameStr << " "
                                           " @" << hexval(rtloadbase) << " size=" << hexval(size)  << '\n';
             c.start = rtloadbase;
             c.size = size;
@@ -334,7 +334,7 @@ void RawMonitor::loadModule(S2EExecutionState *state, const Cfg &c, bool skipIfD
     md.Pid = c.kernelMode ? 0 : state->getPid();
     md.EntryPoint = c.entrypoint;
 
-    s2e()->getDebugStream() << "RawMonitor loaded " << c.name << " " <<
+    s2e()->getDebugStream() << "[loadModule] RawMonitor loaded " << c.name << " " <<
             hexval(c.start) << ' ' << hexval(c.size) << '\n';
     onModuleLoad.emit(state, md);
 }
@@ -348,6 +348,8 @@ void RawMonitor::onTranslateInstructionStart(ExecutionSignal *signal,
 
     for (it = m_cfg.begin(); it != m_cfg.end(); ++it) {
         const Cfg &c = *it;
+		s2e()->getDebugStream() << "[onTIS] RawMonitor:" << c->name << " " << 
+				hexval(c->start) << ' ' << hexval(c->size) << '\n';
         loadModule(state, c, true);
     }
 

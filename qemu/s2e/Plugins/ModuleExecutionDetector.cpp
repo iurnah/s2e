@@ -211,20 +211,20 @@ bool ModuleExecutionDetector::opAddModuleConfigEntry(S2EExecutionState *state)
     desc.moduleName = strModuleName;
     desc.kernelMode = (bool) isKernelMode;
 
-    s2e()->getMessagesStream() << "ModuleExecutionDetector: Adding module " <<
+    s2e()->getMessagesStream() << "ModuleExecutionDetector(opAdd): Adding module " <<
             "id=" << desc.id <<
             " moduleName=" << desc.moduleName <<
             " kernelMode=" << desc.kernelMode << "\n";
 
     if (m_ConfiguredModulesName.find(desc) != m_ConfiguredModulesName.end()) {
-        s2e()->getWarningsStream() << "ModuleExecutionDetector: " <<
+        s2e()->getWarningsStream() << "ModuleExecutionDetector(opAdd): " <<
                 "module name " << desc.moduleName << " already exists\n";
         return false;
     }
 
 
     if (m_ConfiguredModulesId.find(desc) != m_ConfiguredModulesId.end()) {
-        s2e()->getWarningsStream() << "ModuleExecutionDetector: " <<
+        s2e()->getWarningsStream() << "ModuleExecutionDetector(opAdd): " <<
                 "module id " << desc.id << " already exists\n";
         return false;
     }
@@ -305,7 +305,7 @@ void ModuleExecutionDetector::moduleLoadListener(
         }else {
             s2e()->getDebugStream() << " [REGISTERING ID=" << (*it).id << "]" << '\n';
             plgState->loadDescriptor(module, true);
-            onModuleLoad.emit(state, module);
+            onModuleLoad.emit(state, module);//This onMoludeLoad is not from OSMonitor
         }
         return;
     }
