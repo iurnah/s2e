@@ -305,7 +305,10 @@ void ModuleExecutionDetector::moduleLoadListener(
         }else {
             s2e()->getDebugStream() << " [REGISTERING ID=" << (*it).id << "]" << '\n';
             plgState->loadDescriptor(module, true);
-            onModuleLoad.emit(state, module);//This onMoludeLoad is not from OSMonitor
+            onModuleLoad.emit(state, module);
+			//This onMoludeLoad is not from OSMonitor and it emit for other
+			//plugins, i.e. in Annotation plugin, it import and connect this
+			//signal for the specific purpose.
         }
         return;
     }
