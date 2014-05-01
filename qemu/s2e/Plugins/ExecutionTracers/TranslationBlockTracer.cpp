@@ -51,8 +51,9 @@ extern CPUArchState *env;
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(TranslationBlockTracer, "Tracer for executed translation blocks", "TranslationBlockTracer", "ExecutionTracer",
-                  "ModuleExecutionDetector");
+S2E_DEFINE_PLUGIN(TranslationBlockTracer, "Tracer for executed translation blocks", "TranslationBlockTracer", 
+					"ExecutionTracer",
+					"ModuleExecutionDetector");
 
 void TranslationBlockTracer::initialize()
 {
@@ -131,7 +132,6 @@ void TranslationBlockTracer::onModuleTranslateBlockEnd(
 
 //The real tracing is done here
 //-----------------------------
-
 void TranslationBlockTracer::trace(S2EExecutionState *state, uint64_t pc, ExecTraceEntryType type)
 {
     ExecutionTraceTb tb;

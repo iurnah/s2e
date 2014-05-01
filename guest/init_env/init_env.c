@@ -235,6 +235,7 @@ static void __s2e_init_env(int *argcPtr, char ***argvPtr)
 
     #ifndef DEBUG_NATIVE
     s2e_codeselector_select_module("init_env.so");
+	//	Try to disable this codeselector ".
     #endif
     // Recognize --help when it is the sole argument.
     if (argc == 2 && __streq(argv[1], "--help")) {
@@ -306,6 +307,8 @@ static void __s2e_init_env(int *argcPtr, char ***argvPtr)
             const char *process_base_name = __base_name(argv[0]);
             myprintf("Forks will be restricted to %s\n", process_base_name);
             s2e_codeselector_select_module(process_base_name);
+			//Try to comment out this line in order to precisely select the code
+			//to be executed symbolically.
         }
         else {
             /* simply copy arguments */

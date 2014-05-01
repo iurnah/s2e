@@ -94,6 +94,7 @@ void CodeSelector::initialize()
     foreach2(it, moduleList.begin(), moduleList.end()) {
         if (m_executionDetector->isModuleConfigured(*it)) {
             m_interceptedModules.insert(*it);
+			s2e()->getWarningsStream() << "CodeSelector: Module " << *it << " is inserted!\n";
         }else {
             s2e()->getWarningsStream() << "CodeSelector: " <<
                     "Module " << *it << " is not configured\n";
@@ -200,13 +201,20 @@ void CodeSelector::opSelectProcess(S2EExecutionState *state)
             m_privilegeTracking = s2e()->getCorePlugin()->onPrivilegeChange.connect(
                     sigc::mem_fun(*this, &CodeSelector::onPrivilegeChange));
         }
-    } else {
+    } else { //this eles might be not usable by Rui
         m_pidsToTrack[state->getPid()] = true;
 
+		/* might be a bug here ???!!!
         if (!m_privilegeTracking.connected()) {
             m_privilegeTracking = s2e()->getCorePlugin()->onPageDirectoryChange.connect(
                     sigc::mem_fun(*this, &CodeSelector::onPageDirectoryChange));
+        } */
+		//corrected code
+        if (!m_addressSpaceTracking.connected()) {
+            m_addressSpaceTracking = s2e()->getCorePlugin()->onPageDirectoryChange.connect(
+                    sigc::mem_fun(*this, &CodeSelector::onPageDirectoryChange));
         }
+
     }
 }
 
@@ -257,6 +265,8 @@ bool CodeSelector::opSelectModule(S2EExecutionState *state)
 
     if (m_executionDetector->isModuleConfigured(strModuleId)) {
         m_interceptedModules.insert(strModuleId);
+		s2e()->getWarningsStream() << "CodeSelector: " <<
+                "Module " << strModuleId << " is insert to m_interceptedModules\n";
     }else {
         s2e()->getWarningsStream() << "CodeSelector: " <<
                 "Module " << strModuleId << " is not configured\n";
