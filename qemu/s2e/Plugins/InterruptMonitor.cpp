@@ -104,7 +104,7 @@ void InterruptMonitor::onInterruptReturn(S2EExecutionState* state, uint64_t pc)
 		else
 		{
 			InterruptReturnSignal returnSignal = itr->second.back();
-//D			s2e()->getDebugStream() << "Received IRET for INT at 0x" << std::hex << itr->first << std::endl;
+			s2e()->getDebugStream() << "Received IRET for INT at 0x" << std::hex << itr->first << std::endl;
 			returnSignal.emit(state, pc);
 			itr->second.pop_back();
 		}
@@ -112,10 +112,10 @@ void InterruptMonitor::onInterruptReturn(S2EExecutionState* state, uint64_t pc)
 	}
 	else
 	{
-//D		s2e()->getDebugStream() << "no return signal for IRET at 0x" << std::hex << eip << " found" << std::endl;
+		s2e()->getDebugStream() << "no return signal for IRET at 0x" << std::hex << eip << " found" << std::endl;
 	}
 
-//D	s2e()->getDebugStream() << "IRET at 0x" << std::hex << pc << " returning to " << std::hex << eip << std::endl;
+	s2e()->getDebugStream() << "IRET at 0x" << std::hex << pc << " returning to " << std::hex << eip << std::endl;
 }
 
 void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
@@ -174,7 +174,7 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	//Always notify signal at -1
 	plgState->m_signals[-1].emit(state, pc, intNum, returnSignal);
 
-//D	s2e()->getDebugStream() << "Received interrupt 0x" << std::hex << intNum << " at 0x" << pc << std::dec << std::endl;
+	s2e()->getDebugStream() << "Received interrupt 0x" << std::hex << intNum << " at 0x" << pc << std::dec << std::endl;
 }
 
 InterruptMonitorState* InterruptMonitorState::clone() const
@@ -191,9 +191,6 @@ PluginState *InterruptMonitorState::factory(Plugin *p, S2EExecutionState *s)
     ret->m_plugin = static_cast<InterruptMonitor*>(p);
     return ret;
 }
-
-
-
 
 } //namespace plugins
 } //namespace s2e

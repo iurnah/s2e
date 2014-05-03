@@ -45,21 +45,16 @@ LinuxSyscallMonitor::~LinuxSyscallMonitor() {
 void LinuxSyscallMonitor::initialize()
 {
 
-	s2e()->getCorePlugin()->onTranslateBlockEnd.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateBlockEnd));
 	m_detector = static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));  // add by sun for special module
+	s2e()->getCorePlugin()->onTranslateBlockEnd.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateBlockEnd));
 //	s2e()->getCorePlugin()->onTranslateJumpStart.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateJumpStart));
-	m_detector->onModuleLoad.connect(
-		sigc::mem_fun(*this,
-					  &LinuxSyscallMonitor::onModuleLoad)
-	);     //add by sun for special module
+	m_detector->onModuleLoad.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onModuleLoad));     //add by sun for special module
+
 	m_initialized = false;
 }
 
 /* add by sun for specail module */
-void LinuxSyscallMonitor::onModuleLoad(
-	S2EExecutionState* state,
-	const ModuleDescriptor &module
-)
+void LinuxSyscallMonitor::onModuleLoad( S2EExecutionState* state, const ModuleDescriptor &module)
 {
 	spe_pid = module.Pid;
 }
@@ -93,7 +88,6 @@ void LinuxSyscallMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
 		signal->connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onSysexit));
 	}
 
-	//m_detector = static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));
 }
 
 void LinuxSyscallMonitor::onSysenter(S2EExecutionState* state, uint64_t pc)
@@ -263,16 +257,19 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 
 	plgState->m_allSyscallsSignal.emit(state, pc, syscall_type, eax, signal);
 	
-	//s2e()->getMessagesStream(state) << "20 "<< "'\n";
-    if (spe_pid && state->getPid() == spe_pid)
-		s2e()->getWarningsStream(state) << "0x" << hexval(pc)  << ": System call " << eax  << "/" <<
-			getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
 	s2e()->getDebugStream(state) << "0x" << hexval(pc)  << ": System call " << eax  << "/" <<
-		getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
-	//s2e()->getDebugStream (state) <<" eax:" << hexval(s.eax) << " ebx:" << hexval(s.ebx) << " ecx:" << hexval(s.ecx) << " edx:" << hexval(s.edx)<< " esi:" << hexval(s.esi) << " edi:" << hexval(s.edi) << " ebp:" << hexval(s.ebp) << " esp:" << hexval(s.esp) << "\n";
+			getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
+	s2e()->getDebugStream (state) <<" eax:" << hexval(s.eax) << " ebx:" << hexval(s.ebx) << " ecx:" << hexval(s.ecx) << " edx:" 
+			<< hexval(s.edx)<< " esi:" << hexval(s.esi) << " edi:" << hexval(s.edi) << " ebp:" << hexval(s.ebp) << " esp:" << hexval(s.esp) << "\n";
+	
+	//s2e()->getMessagesStream(state) << "20 "<< "'\n";
+	//if (spe_pid && state->getPid() == spe_pid)
+			
+	//s2e()->getWarningsStream(state) << "0x" << hexval(pc)  << ": System call " << eax  << "/" <<
+	//		getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
 
     //s2e()->getMessagesStream(state) << "0x" << hexval(pc)  << ": System call 0x" << hexval(eax)  << "/" <<
-	//		getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
+	//							getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
 	//s2e()->getMessagesStream(state) << "21 "<< "'\n";
 }
 
