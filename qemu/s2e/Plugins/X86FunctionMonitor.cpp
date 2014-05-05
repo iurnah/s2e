@@ -67,7 +67,7 @@ void X86FunctionMonitor::initialize()
                                      &X86FunctionMonitor::slotTraceCall));
     }
 #endif
-	s2e()->getDebugStream() << "X86FunctionMonitor: Plugin Initialized" << hexval(ret) << '\n';
+	s2e()->getDebugStream() << "X86FunctionMonitor: Plugin Initialized" << '\n';
 }
 
 //XXX: Implement onmoduleunload to automatically clear all call signals

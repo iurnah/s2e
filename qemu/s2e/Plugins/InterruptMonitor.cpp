@@ -124,7 +124,7 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	char insnByte;
 	int intNum = -1;
 
-	s2e()->getDebugStream() << "InterruptMonitor: Interrupt captured!!!"
+	s2e()->getDebugStream() << "InterruptMonitor: Interrupt captured!!!" << '\n';
 	DECLARE_PLUGINSTATE(InterruptMonitorState, state);
 
 	if (!state->readMemoryConcrete(pc, &insnByte, 1))
