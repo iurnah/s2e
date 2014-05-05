@@ -112,7 +112,7 @@ void InterruptMonitor::onInterruptReturn(S2EExecutionState* state, uint64_t pc)
 	}
 	else
 	{
-		s2e()->getDebugStream() << "no return signal for IRET at 0x" << hexvaleip << " found" << '\n';
+		s2e()->getDebugStream() << "no return signal for IRET at 0x" << hexval(eip) << " found" << '\n';
 	}
 
 	s2e()->getDebugStream() << "IRET at 0x" << hexval(pc) << " returning to " << hexval(eip) << '\n';
@@ -174,7 +174,7 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	//Always notify signal at -1
 	plgState->m_signals[-1].emit(state, pc, intNum, returnSignal);
 
-	s2e()->getDebugStream() << "Received interrupt 0x" << hexval(intNum) << " at 0x" << pc << std::dec << '\n';
+	s2e()->getDebugStream() << "Received interrupt 0x" << hexval(intNum) << " at 0x" << hexval(pc) << '\n';
 }
 
 InterruptMonitorState* InterruptMonitorState::clone() const
