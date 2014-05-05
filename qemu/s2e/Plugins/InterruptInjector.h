@@ -63,7 +63,7 @@ private:
     DeviceDescriptor *m_deviceDescriptor;
 
     void onLibraryCall(S2EExecutionState* state,
-                       FunctionMonitorState* fns,
+                       X86FunctionMonitorState* fns,
                        const ModuleDescriptor& mod);
 };
 

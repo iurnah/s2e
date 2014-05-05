@@ -65,7 +65,7 @@ void InterruptInjector::initialize()
 }
 
 void InterruptInjector::onLibraryCall(S2EExecutionState* state,
-                                      FunctionMonitorState* fns,
+                                      X86FunctionMonitorState* fns,
                                       const ModuleDescriptor& mod)
 {
     m_deviceDescriptor->setInterrupt(true);
