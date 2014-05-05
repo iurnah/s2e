@@ -52,11 +52,11 @@ namespace s2e {
 namespace plugins {
 
 S2E_DEFINE_PLUGIN(LibraryCallMonitor, "Flags all calls to external libraries", "LibraryCallMonitor",
-                  "Interceptor", "FunctionMonitor", "ModuleExecutionDetector");
+                  "Interceptor", "X86FunctionMonitor", "ModuleExecutionDetector");
 
 void LibraryCallMonitor::initialize()
 {
-    m_functionMonitor = static_cast<FunctionMonitor*>(s2e()->getPlugin("FunctionMonitor"));
+    m_functionMonitor = static_cast<X86FunctionMonitor*>(s2e()->getPlugin("X86FunctionMonitor"));
     m_monitor = static_cast<OSMonitor*>(s2e()->getPlugin("Interceptor"));
     m_detector = static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));
 
@@ -132,7 +132,7 @@ void LibraryCallMonitor::onModuleLoad(
             const char *cstring = (*insertRes.first).c_str();
             plgState->m_functions[address] = cstring;
 
-            FunctionMonitor::CallSignal *cs = m_functionMonitor->getCallSignal(state, address, module.Pid);
+            X86FunctionMonitor::CallSignal *cs = m_functionMonitor->getCallSignal(state, address, module.Pid);
             cs->connect(sigc::mem_fun(*this, &LibraryCallMonitor::onFunctionCall));
         }
     }
@@ -147,7 +147,7 @@ void LibraryCallMonitor::onModuleUnload(
     return;
 }
 
-void LibraryCallMonitor::onFunctionCall(S2EExecutionState* state, FunctionMonitorState *fns)
+void LibraryCallMonitor::onFunctionCall(S2EExecutionState* state, X86FunctionMonitorState *fns)
 {
     //Only track configured modules
     uint64_t caller = state->getTb()->pcOfLastInstr;

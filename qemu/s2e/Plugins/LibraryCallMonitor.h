@@ -45,7 +45,7 @@
 #include <string>
 
 #include "ModuleExecutionDetector.h"
-#include "FunctionMonitor.h"
+#include "X86FunctionMonitor.h"
 #include "OSMonitor.h"
 
 namespace s2e {
@@ -64,14 +64,14 @@ public:
 
     sigc::signal<void,
                  S2EExecutionState*,
-                 FunctionMonitorState*,
+                 X86FunctionMonitorState*,
                  const ModuleDescriptor& /* The module  being called */>
           onLibraryCall;
 
 private:
     OSMonitor * m_monitor;
     ModuleExecutionDetector *m_detector;
-    FunctionMonitor *m_functionMonitor;
+    X86FunctionMonitor *m_functionMonitor;
     StringSet m_functionNames;
     AddressPairs m_alreadyCalledFunctions;
 
@@ -90,7 +90,7 @@ private:
             S2EExecutionState* state,
             const ModuleDescriptor &module
             );
-    void onFunctionCall(S2EExecutionState* state, FunctionMonitorState *fns);
+    void onFunctionCall(S2EExecutionState* state, X86FunctionMonitorState *fns);
 };
 
 class LibraryCallMonitorState : public PluginState
