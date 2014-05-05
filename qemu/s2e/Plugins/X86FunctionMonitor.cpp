@@ -48,7 +48,7 @@ extern "C" {
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(FunctionMonitor, "Function calls/returns monitoring plugin", "",);
+S2E_DEFINE_PLUGIN(X86FunctionMonitor, "Function calls/returns monitoring plugin", "",);
 
 void X86FunctionMonitor::initialize()
 {
