@@ -57,11 +57,9 @@ void InterruptMonitor::slotTranslateBlockEnd(ExecutionSignal *signal,
                                       uint64_t pc, bool, uint64_t)
 {
 
-	s2e()->getDebugStream() << "InterruptMonitor: slotTranslateBlockEnd is detected!!!" << '\n';
-	if (tb->s2e_tb_type == TB_INTERRUPT)
+	if (tb->s2e_tb_type == TB_INTERRUPT) //XXX: Currently not be able to detect TB_INTERRUPT
 	{
 		signal->connect(sigc::mem_fun(*this, &InterruptMonitor::onInterrupt));
-		s2e()->getDebugStream() << "InterruptMonitor: TB_INTERRUPT connected to onInterrupt" << '\n';
 	}
 }
 
@@ -73,6 +71,7 @@ void InterruptMonitor::onTranslateJumpStart(ExecutionSignal *signal,
 	if (jump_type == JT_IRET)
 	{
 		signal->connect(sigc::mem_fun(*this, &InterruptMonitor::onInterruptReturn));
+		s2e()->getDebugStream() << "InterruptMonitor: onInterruptReturn connected!!!" << '\n';
 	}
 }
 
@@ -126,7 +125,6 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	char insnByte;
 	int intNum = -1;
 
-	s2e()->getDebugStream() << "InterruptMonitor: Interrupt captured!!!" << '\n';
 	DECLARE_PLUGINSTATE(InterruptMonitorState, state);
 
 	if (!state->readMemoryConcrete(pc, &insnByte, 1))

@@ -85,10 +85,12 @@ void X86FunctionMonitor::slotTranslateBlockEnd(ExecutionSignal *signal,
                                       TranslationBlock *tb,
                                       uint64_t pc, bool, uint64_t)
 {
-    /* We intercept all call and ret translation blocks */
+	s2e()->getDebugStream() << "X86FunctionMonitor: slotTranslateBlockEnd!!!" << '\n';
+	/* We intercept all call and ret translation blocks */
     if (tb->s2e_tb_type == TB_CALL || tb->s2e_tb_type == TB_CALL_IND) {
         signal->connect(sigc::mem_fun(*this,
                             &X86FunctionMonitor::slotCall));
+	s2e()->getDebugStream() << "X86FunctionMonitor: slotCall Connected!!!" << '\n';
     }
 }
 

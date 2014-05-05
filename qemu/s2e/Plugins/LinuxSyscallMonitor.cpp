@@ -259,9 +259,9 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 
 	plgState->m_allSyscallsSignal.emit(state, pc, syscall_type, eax, signal);
 	
-	s2e()->getDebugStream(state) << "0x" << hexval(pc)  << ": System call " << eax  << "/" <<
+	s2e()->getDebugStream(state) << hexval(pc)  << ": System call " << eax  << "/" <<
 			getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
-	s2e()->getDebugStream (state) <<" eax:" << hexval(s.eax) << " ebx:" << hexval(s.ebx) << " ecx:" << hexval(s.ecx) << " edx:" 
+	s2e()->getDebugStream (state) <<"eax:" << hexval(s.eax) << " ebx:" << hexval(s.ebx) << " ecx:" << hexval(s.ecx) << " edx:" 
 			<< hexval(s.edx)<< " esi:" << hexval(s.esi) << " edi:" << hexval(s.edi) << " ebp:" << hexval(s.ebp) << " esp:" << hexval(s.esp) << "\n";
 	
 	//s2e()->getMessagesStream(state) << "20 "<< "'\n";
