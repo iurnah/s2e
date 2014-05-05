@@ -458,6 +458,7 @@ s2eobj-i386-y =
 s2eobj-i386-y += s2e/Plugins/InterruptMonitor.o
 s2eobj-i386-y += s2e/Plugins/LinuxSyscallMonitor.o
 s2eobj-i386-y += s2e/Plugins/X86FunctionMonitor.o
+s2eobj-i386-y += s2e/Plugins/LibraryCallMonitor.o
 s2eobj-i386-y += s2e/Plugins/InterruptInjector.o
 s2eobj-i386-y += s2e/Plugins/X86ExceptionInterceptor.o
 s2eobj-i386-y += s2e/Plugins/SymbolicHardware.o
@@ -512,7 +513,6 @@ s2eobj-y += s2e/Plugins/MemoryChecker.o
 s2eobj-y += s2e/Plugins/StackChecker.o
 s2eobj-y += s2e/Plugins/Searchers/CooperativeSearcher.o
 s2eobj-y += s2e/Plugins/HostFiles.o
-s2eobj-y += s2e/Plugins/LibraryCallMonitor.o
 s2eobj-y += s2e/Plugins/Searchers/MaxTbSearcher.o
 
 #sqlite database is deprecated now
