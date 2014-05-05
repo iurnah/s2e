@@ -52,6 +52,8 @@ S2E_DEFINE_PLUGIN(X86FunctionMonitor, "Function calls/returns monitoring plugin"
 
 void X86FunctionMonitor::initialize()
 {
+    m_monitor = static_cast<OSMonitor*>(s2e()->getPlugin("Interceptor"));
+
     s2e()->getCorePlugin()->onTranslateBlockEnd.connect(
             sigc::mem_fun(*this, &X86FunctionMonitor::slotTranslateBlockEnd));
 
@@ -65,8 +67,7 @@ void X86FunctionMonitor::initialize()
                                      &X86FunctionMonitor::slotTraceCall));
     }
 #endif
-
-    m_monitor = static_cast<OSMonitor*>(s2e()->getPlugin("Interceptor"));
+	s2e()->getDebugStream() << "X86FunctionMonitor: Plugin Initialized" << hexval(ret) << '\n';
 }
 
 //XXX: Implement onmoduleunload to automatically clear all call signals
@@ -173,7 +174,7 @@ X86FunctionMonitorState::~X86FunctionMonitorState()
 X86FunctionMonitorState* X86FunctionMonitorState::clone() const
 {
     X86FunctionMonitorState *ret = new X86FunctionMonitorState(*this);
-    m_plugin->s2e()->getDebugStream() << "Forking FunctionMonitorState ret=" << hexval(ret) << '\n';
+    m_plugin->s2e()->getDebugStream() << "X86FunctionMonitor: Forking FunctionMonitorState ret=" << hexval(ret) << '\n';
     assert(ret->m_returnDescriptors.size() == m_returnDescriptors.size());
     return ret;
 }

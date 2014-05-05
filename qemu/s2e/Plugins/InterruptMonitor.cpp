@@ -39,6 +39,7 @@ void InterruptMonitor::initialize()
 {
 	s2e()->getCorePlugin()->onTranslateBlockEnd.connect(sigc::mem_fun(*this, &InterruptMonitor::slotTranslateBlockEnd));
 	s2e()->getCorePlugin()->onTranslateJumpStart.connect(sigc::mem_fun(*this, &InterruptMonitor::onTranslateJumpStart));
+	s2e()->getDebugStream() << "InterruptMonitor: Plugin initialized!!!" << '\n';
 }
 
 InterruptMonitor::InterruptSignal& InterruptMonitor::getInterruptSignal(S2EExecutionState* state, int interrupt)
@@ -123,6 +124,7 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	char insnByte;
 	int intNum = -1;
 
+	s2e()->getDebugStream() << "InterruptMonitor: Interrupt captured!!!"
 	DECLARE_PLUGINSTATE(InterruptMonitorState, state);
 
 	if (!state->readMemoryConcrete(pc, &insnByte, 1))
@@ -150,8 +152,7 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	else
 	{
 		/* Invalid Opcode */
-		s2e()->getWarningsStream() << "Unexpected opcode 0x" << hexval((unsigned int) insnByte) << " at 0x" <<
-				hexval(pc) << ", expected 0xcc or 0xcd" << '\n';//std::dec << '\n';
+		s2e()->getWarningsStream() << "Unexpected opcode 0x" << hexval((unsigned int) insnByte)				<< " at 0x" << hexval(pc) << ", expected 0xcc or 0xcd" << '\n';//std::dec << '\n';
 		return;
 	}
 

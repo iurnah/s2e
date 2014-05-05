@@ -18,7 +18,7 @@ extern "C" {
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(LinuxSyscallMonitor, "Linux syscall monitoring plugin", " ",);  //add by sun for special module
+S2E_DEFINE_PLUGIN(LinuxSyscallMonitor, "Linux syscall monitoring plugin", "ModuleExecutionDetector",);  //add by sun for special module
 
 static const int TP = 0x1;
 static const int TD = 0x2;
@@ -51,6 +51,7 @@ void LinuxSyscallMonitor::initialize()
 	m_detector->onModuleLoad.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onModuleLoad));     //add by sun for special module
 
 	m_initialized = false;
+	s2e()->getDebugStream() << "LinuxSyscallMonitor: Plugin initialized!!!" << '\n';
 }
 
 /* add by sun for specail module */
