@@ -57,9 +57,11 @@ void InterruptMonitor::slotTranslateBlockEnd(ExecutionSignal *signal,
                                       uint64_t pc, bool, uint64_t)
 {
 
+	s2e()->getDebugStream() << "InterruptMonitor: slotTranslateBlockEnd is detected!!!" << '\n';
 	if (tb->s2e_tb_type == TB_INTERRUPT)
 	{
 		signal->connect(sigc::mem_fun(*this, &InterruptMonitor::onInterrupt));
+		s2e()->getDebugStream() << "InterruptMonitor: TB_INTERRUPT connected to onInterrupt" << '\n';
 	}
 }
 

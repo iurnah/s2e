@@ -65,6 +65,7 @@ void LinuxSyscallMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
                                           TranslationBlock *tb,
                                           uint64_t pc, bool, uint64_t)
 {
+	s2e()->getDebugStream() << "LinuxSyscallMonitor: onTranslateBlockEnd is detected!!!" << '\n';
 	if (!m_initialized)
 	{
 		Plugin* intMonPlugin = s2e()->getPlugin("InterruptMonitor");
