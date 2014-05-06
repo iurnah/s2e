@@ -6853,6 +6853,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         }
         break;
     case 0xcc: /* int3 */
+		SET_TB_TYPE(TB_INTERRUPT);
         gen_interrupt(s, EXCP03_INT3, pc_start - s->cs_base, s->pc - s->cs_base);
         break;
     case 0xcd: /* int N */
@@ -6860,6 +6861,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         if (s->vm86 && s->iopl != 3) {
             gen_exception(s, EXCP0D_GPF, pc_start - s->cs_base);
         } else {
+			SET_TB_TYPE(TB_INTERRUPT);
             gen_interrupt(s, val, pc_start - s->cs_base, s->pc - s->cs_base);
         }
         break;
