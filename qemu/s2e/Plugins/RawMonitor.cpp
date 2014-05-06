@@ -284,10 +284,6 @@ void RawMonitor::onCustomInstruction(S2EExecutionState* state, uint64_t opcode)
 
     uint8_t op = OPCODE_GETSUBFUNCTION(opcode);
 
-	opcode >>= 16;
-	uint8_t op = opcode & 0xFF;
-	opcode >>= 8;
-
     switch(op) {
     case 0: {
         //Module load
