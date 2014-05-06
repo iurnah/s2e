@@ -58,7 +58,7 @@ extern "C" {
 #include "config.h"
 #include "qemu-common.h"
 #include "cpu.h"
-extern CPUArchState *env;
+extern CPUX86State *env;
 }
 
 
@@ -183,9 +183,9 @@ bool ModuleExecutionDetector::opAddModuleConfigEntry(S2EExecutionState *state)
     //XXX: 32-bits guests only
     target_ulong moduleId, moduleName, isKernelMode;
 
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(MODULEID), &moduleId, sizeof(moduleId));
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(MODULENAME), &moduleName, sizeof(moduleName));
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(KERNELMODE), &isKernelMode, sizeof(isKernelMode));
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(R_ECX), &moduleId, sizeof(moduleId));
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(R_EAX), &moduleName, sizeof(moduleName));
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(R_EDX), &isKernelMode, sizeof(isKernelMode));
 
     if(!ok) {
         s2e()->getWarningsStream(state)

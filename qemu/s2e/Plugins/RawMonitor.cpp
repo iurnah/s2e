@@ -160,11 +160,11 @@ void RawMonitor::opLoadConfiguredModule(S2EExecutionState *state)
     target_ulong rtloadbase, name, size;
     bool ok = true;
 
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(PARAM0),
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EAX]),
                                          &name, sizeof name);
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(PARAM1),
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EBX]),
                                          &rtloadbase, sizeof rtloadbase);
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(PARAM2),
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_ECX]),
                                          &size, sizeof size);
 
     if(!ok) {
@@ -201,7 +201,7 @@ void RawMonitor::opLoadModule(S2EExecutionState *state)
     target_ulong pModuleConfig;
     bool ok = true;
 
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(PARAM2),
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_ECX]),
                                          &pModuleConfig, sizeof(pModuleConfig));
     if(!ok) {
         s2e()->getWarningsStream(state)
@@ -241,11 +241,11 @@ void RawMonitor::opCreateImportDescriptor(S2EExecutionState *state)
 {
     target_ulong dllname, funcname, funcptr;
     bool ok = true;
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(PARAM0),
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EAX]),
                                          &dllname, sizeof dllname);
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(PARAM1),
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EBX]),
                                          &funcname, sizeof funcname);
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(PARAM2),
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_ECX]),
                                          &funcptr, sizeof funcptr);
 
     if (!ok) {
@@ -283,6 +283,10 @@ void RawMonitor::onCustomInstruction(S2EExecutionState* state, uint64_t opcode)
     }
 
     uint8_t op = OPCODE_GETSUBFUNCTION(opcode);
+
+	opcode >>= 16;
+	uint8_t op = opcode & 0xFF;
+	opcode >>= 8;
 
     switch(op) {
     case 0: {
@@ -356,10 +360,43 @@ void RawMonitor::onTranslateInstructionStart(ExecutionSignal *signal,
     m_onTranslateInstruction.disconnect();
 }
 
-
+/*
 bool RawMonitor::getImports(S2EExecutionState *s, const ModuleDescriptor &desc, Imports &I)
 {
     I = m_imports;
+    return true;
+}
+*/
+
+bool RawMonitor::getImports(S2EExecutionState *s, const ModuleDescriptor &desc, Imports &I)
+{
+	s2e()->getWarningsStream() << "Program PID:"<<hexval(s->getPid())<<hexval(desc.Pid)<< "\n";      //add by sun for librarycall
+    if (desc.Pid && s->getPid() != desc.Pid) {
+        return false;
+    }
+
+    //WindowsImage Img(s, desc.LoadBase);
+    //I = Img.GetImports(s);
+    ImportedFunctions F;
+	
+	F.insert(std::pair<std::string, uint64_t>("read@plt-0x10", 0x08048430));
+	F.insert(std::pair<std::string, uint64_t>("read@plt", 0x08048440));
+	F.insert(std::pair<std::string, uint64_t>("printf", 0x08048450));
+	F.insert(std::pair<std::string, uint64_t>("accept", 0x08048460));
+	F.insert(std::pair<std::string, uint64_t>("__gmon_start__", 0x08048480));
+	F.insert(std::pair<std::string, uint64_t>("__libc_start_main", 0x08048490));
+	F.insert(std::pair<std::string, uint64_t>("write", 0x080484a0));
+	F.insert(std::pair<std::string, uint64_t>("bind", 0x080484b0));
+	F.insert(std::pair<std::string, uint64_t>("listen", 0x080484c0));
+	F.insert(std::pair<std::string, uint64_t>("socket", 0x080484d0));
+	F.insert(std::pair<std::string, uint64_t>("inet_addr", 0x080484e0));
+	F.insert(std::pair<std::string, uint64_t>("close", 0x080484f0));
+	F.insert(std::pair<std::string, uint64_t>("puts", 0x08048470));
+
+	I.insert(pair<std::string, ImportedFunctions>("GLIBC_2_0", F));
+	Imports::iterator st = I.find("GLIBC_2_0");
+	s2e()->getWarningsStream() << st->first << "\n";      //add by sun for librarycall
+
     return true;
 }
 
