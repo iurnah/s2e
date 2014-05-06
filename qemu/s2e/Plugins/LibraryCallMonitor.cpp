@@ -91,8 +91,8 @@ void LibraryCallMonitor::initialize()
             sigc::mem_fun(*this,
                     &LibraryCallMonitor::onModuleUnload)
             );
+	s2e()->getDebugStream() << "LibraryCallMonitor: Plugin initialized!!!" << '\n';
 }
-
 
 void LibraryCallMonitor::onModuleLoad(
         S2EExecutionState* state,
