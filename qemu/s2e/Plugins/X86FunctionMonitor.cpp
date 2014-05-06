@@ -212,7 +212,7 @@ void X86FunctionMonitorState::slotCall(S2EExecutionState *state, uint64_t pc)
 {
     target_ulong cr3 = state->getPid();
     target_ulong eip = state->getPc();
-
+	s2e()->getDebugStream() << "X86FunctionMonitorState: slotCall triggered!!!" << '\n';
     if (!m_newCallDescriptors.empty()) {
         m_callDescriptors.insert(m_newCallDescriptors.begin(), m_newCallDescriptors.end());
         m_newCallDescriptors.clear();
