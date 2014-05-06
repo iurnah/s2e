@@ -114,7 +114,7 @@ void LibraryCallMonitor::onModuleLoad(
             return;
         }
     }
-	s2e()->getDebugStream() << "LibraryCallMonitor: onModuleLoad is called!!! << '\n';
+	s2e()->getDebugStream() << "LibraryCallMonitor: onModuleLoad is called!!!" << '\n';
     DECLARE_PLUGINSTATE(LibraryCallMonitorState, state);
 
     foreach2(it, imports.begin(), imports.end()) {
