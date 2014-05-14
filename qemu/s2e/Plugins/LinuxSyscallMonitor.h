@@ -72,7 +72,7 @@ public:
 		const char arg4; 
 		const char arg5; 
 		const char arg6; 
-	}
+	};
 	typedef enum ESyscallType SyscallType;
 	typedef struct SSyscallInformation SyscallInformation;
 	typedef sigc::signal<void, S2EExecutionState*, uint64_t> SyscallReturnSignal;

@@ -175,7 +175,7 @@ void LinuxSyscallMonitor::onInt80(S2EExecutionState* state, uint64_t pc, int int
 }
 
 const LinuxSyscallMonitor::SyscallInformation& LinuxSyscallMonitor::getSyscallInformation(int syscallNr) {
-	static SyscallInformation symbolic_syscall = { 0, "SYMBOLIC-CALL-NUMBER", 0, "", "", "", "", "", "", "" },
+	static SyscallInformation symbolic_syscall = { 0, "SYMBOLIC-CALL-NUMBER", 0, "", "", "", "", "", "", "" };
 	assert(syscallNr >= -1 && syscallNr <= MAX_SYSCALL_NR);
 
 	if (syscallNr == -1)
@@ -258,7 +258,7 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 
 	plgState->m_allSyscallsSignal.emit(state, pc, syscall_type, eax, signal);
 
-	s2e()->getDebugStream(state) << "PID=" << hexval(cr3) << " PC=" hexval(pc) << ": EAX=" << eax  << "/" 
+	s2e()->getDebugStream(state) << "PID=" << hexval(cr3) << " PC=" << hexval(pc) << ": EAX=" << eax << "/" 
 			<< "\t\t\t" << getSyscallInformation(eax).name << " (" << syscall_type << ") " << hexval(s.eax) << ":"<< getSyscallInformation(eax).index << "\n"
 			<< hexval(s.ebx) << "=" << getSyscallInformation(eax).arg0 << hexval(s.ecx) << "=" << getSyscallInformation(eax).arg1 
 			<< hexval(s.edx) << "=" << getSyscallInformation(eax).arg2 << hexval(s.esi) << "=" << getSyscallInformation(eax).arg3
