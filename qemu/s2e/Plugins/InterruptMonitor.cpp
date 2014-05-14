@@ -175,7 +175,7 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	//Always notify signal at -1
 	plgState->m_signals[-1].emit(state, pc, intNum, returnSignal);
 
-	s2e()->getDebugStream() << "Received interrupt 0x" << hexval(intNum) << " at 0x" << hexval(pc) << '\n';
+	//s2e()->getDebugStream() << "Received interrupt 0x" << hexval(intNum) << " at 0x" << hexval(pc) << '\n';
 }
 
 InterruptMonitorState* InterruptMonitorState::clone() const
