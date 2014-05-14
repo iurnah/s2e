@@ -30,7 +30,8 @@ static const int TS = 0x40;
 
 
 LinuxSyscallMonitor::SyscallInformation LinuxSyscallMonitor::m_syscallInformation[] = {
-#include "syscallent-simple.h"
+//#include "syscallent-simple.h"
+#include "syscalls-table-3.2.57.h"
 };
 
 LinuxSyscallMonitor::LinuxSyscallMonitor(S2E* s2e) : Plugin(s2e) {
@@ -174,8 +175,7 @@ void LinuxSyscallMonitor::onInt80(S2EExecutionState* state, uint64_t pc, int int
 }
 
 const LinuxSyscallMonitor::SyscallInformation& LinuxSyscallMonitor::getSyscallInformation(int syscallNr) {
-	static SyscallInformation symbolic_syscall = {0, 0, "symbolic syscall number", 0};
-
+	static SyscallInformation symbolic_syscall = { 0, "SYMBOLIC-CALL-NUMBER", 0, "", "", "", "", "", "", "" },
 	assert(syscallNr >= -1 && syscallNr <= MAX_SYSCALL_NR);
 
 	if (syscallNr == -1)
@@ -257,12 +257,21 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 	}
 
 	plgState->m_allSyscallsSignal.emit(state, pc, syscall_type, eax, signal);
-	
+
+	s2e()->getDebugStream(state) << "PID=" << hexval(cr3) << " PC=" hexval(pc) << ": EAX=" << eax  << "/" 
+			<< "\t\t\t" << getSyscallInformation(eax).name << " (" << syscall_type << ") " << hexval(s.eax) << ":"<< getSyscallInformation(eax).index << "\n"
+			<< hexval(s.ebx) << "=" << getSyscallInformation(eax).arg0 << hexval(s.ecx) << "=" << getSyscallInformation(eax).arg1 
+			<< hexval(s.edx) << "=" << getSyscallInformation(eax).arg2 << hexval(s.esi) << "=" << getSyscallInformation(eax).arg3
+			<< hexval(s.edi) << "=" << getSyscallInformation(eax).arg4 
+			<< "\t EBP=" << hexval(s.ebp) << "\n"
+			<< "\t ESP=" << hexval(s.esp) << "\n";
+
+/*	
 	s2e()->getDebugStream(state) << hexval(pc)  << ": System call " << eax  << "/" <<
 			getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
 	s2e()->getDebugStream (state) <<"eax:" << hexval(s.eax) << " ebx:" << hexval(s.ebx) << " ecx:" << hexval(s.ecx) << " edx:" 
 			<< hexval(s.edx)<< " esi:" << hexval(s.esi) << " edi:" << hexval(s.edi) << " ebp:" << hexval(s.ebp) << " esp:" << hexval(s.esp) << "\n";
-	
+*/	
 	//s2e()->getMessagesStream(state) << "20 "<< "'\n";
 	//if (spe_pid && state->getPid() == spe_pid)
 			

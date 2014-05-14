@@ -51,6 +51,7 @@ public:
 	
 	static const int MAX_SYSCALL_NR = 444;
 	enum ESyscallType {SYSCALL_INT, SYSCALL_SYSENTER, SYSCALL_SYSCALL};
+/*
 	struct SSyscallInformation
 	{
 		int argumentCount;
@@ -58,7 +59,20 @@ public:
 		const char * name;
 		int misc;
 	};
-
+*/
+	struct SSyscallInformation
+	{
+		int index;
+		const char * name;
+		int argcount;
+		const char arg0; 
+		const char arg1; 
+		const char arg2; 
+		const char arg3; 
+		const char arg4; 
+		const char arg5; 
+		const char arg6; 
+	}
 	typedef enum ESyscallType SyscallType;
 	typedef struct SSyscallInformation SyscallInformation;
 	typedef sigc::signal<void, S2EExecutionState*, uint64_t> SyscallReturnSignal;
