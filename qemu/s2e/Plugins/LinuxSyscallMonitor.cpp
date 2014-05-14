@@ -258,11 +258,11 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 
 	plgState->m_allSyscallsSignal.emit(state, pc, syscall_type, eax, signal);
 
-	s2e()->getDebugStream(state) << "PID=" << hexval(cr3) << " PC=" << hexval(pc) << ": EAX=" << eax << "/" 
-			<< "\t\t\t" << getSyscallInformation(eax).name << " (" << syscall_type << ") " << hexval(s.eax) << ":"<< getSyscallInformation(eax).index << "\n"
-			<< hexval(s.ebx) << "=" << getSyscallInformation(eax).arg0 << hexval(s.ecx) << "=" << getSyscallInformation(eax).arg1 
-			<< hexval(s.edx) << "=" << getSyscallInformation(eax).arg2 << hexval(s.esi) << "=" << getSyscallInformation(eax).arg3
-			<< hexval(s.edi) << "=" << getSyscallInformation(eax).arg4 
+	s2e()->getDebugStream(state) << "PID=" << hexval(cr3) << " PC=" << hexval(pc) << " " << eax  
+			<< getSyscallInformation(eax).name << " (" << syscall_type << ") " << hexval(s.eax) << ":"<< getSyscallInformation(eax).index << "\n" << "***************"
+			<< hexval(s.ebx) << "=" << getSyscallInformation(eax).arg0 << " | " <<  hexval(s.ecx) << "=" << getSyscallInformation(eax).arg1 << " | " 
+			<< hexval(s.edx) << "=" << getSyscallInformation(eax).arg2 << " | " <<  hexval(s.esi) << "=" << getSyscallInformation(eax).arg3 << " | "
+			<< hexval(s.edi) << "=" << getSyscallInformation(eax).arg4 << "\n"
 			<< "\t EBP=" << hexval(s.ebp) << "\n"
 			<< "\t ESP=" << hexval(s.esp) << "\n";
 
