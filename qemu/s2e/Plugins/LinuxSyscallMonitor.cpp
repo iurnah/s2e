@@ -258,13 +258,13 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 
 	plgState->m_allSyscallsSignal.emit(state, pc, syscall_type, eax, signal);
 
-	s2e()->getDebugStream(state) << "PID=" << hexval(cr3) << " PC=" << hexval(pc) << "SYSCALL NO:" << eax << " = "  
-			<< getSyscallInformation(eax).name << " (argN=" << getSyscallInformation(eax).argcount << ") " << "\n" << "***************"
+	s2e()->getDebugStream(state) << "PID=" << hexval(cr3) << ", PC=" << hexval(pc) << ", SYSCALLNO:" << eax << " = "  
+			<< getSyscallInformation(eax).name << ", (argN=" << getSyscallInformation(eax).argcount << ") " << "\n" << "***************  "
 			<< hexval(s.ebx) << " =" << getSyscallInformation(eax).arg0 << " | " <<  hexval(s.ecx) << " =" << getSyscallInformation(eax).arg1 << " | " 
 			<< hexval(s.edx) << " =" << getSyscallInformation(eax).arg2 << " | " <<  hexval(s.esi) << " =" << getSyscallInformation(eax).arg3 << " | "
 			<< hexval(s.edi) << " =" << getSyscallInformation(eax).arg4 << "\n" << "***************"
-			<< "\t EBP=" << hexval(s.ebp) << "\n" << "***************"
-			<< "\t ESP=" << hexval(s.esp) << "\n";
+			<< "EBP = " << hexval(s.ebp) << "\n" << "***************"
+			<< "ESP = " << hexval(s.esp) << "\n";
 
 /*	
 	s2e()->getDebugStream(state) << hexval(pc)  << ": System call " << eax  << "/" <<
