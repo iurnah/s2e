@@ -375,19 +375,15 @@ bool RawMonitor::getImports(S2EExecutionState *s, const ModuleDescriptor &desc, 
     //I = Img.GetImports(s);
     ImportedFunctions F;
 	
-	F.insert(std::pair<std::string, uint64_t>("read@plt-0x10", 0x08048430));
-	F.insert(std::pair<std::string, uint64_t>("read@plt", 0x08048440));
-	F.insert(std::pair<std::string, uint64_t>("printf", 0x08048450));
-	F.insert(std::pair<std::string, uint64_t>("accept", 0x08048460));
-	F.insert(std::pair<std::string, uint64_t>("__gmon_start__", 0x08048480));
-	F.insert(std::pair<std::string, uint64_t>("__libc_start_main", 0x08048490));
-	F.insert(std::pair<std::string, uint64_t>("write", 0x080484a0));
-	F.insert(std::pair<std::string, uint64_t>("bind", 0x080484b0));
-	F.insert(std::pair<std::string, uint64_t>("listen", 0x080484c0));
-	F.insert(std::pair<std::string, uint64_t>("socket", 0x080484d0));
-	F.insert(std::pair<std::string, uint64_t>("inet_addr", 0x080484e0));
-	F.insert(std::pair<std::string, uint64_t>("close", 0x080484f0));
-	F.insert(std::pair<std::string, uint64_t>("puts", 0x08048470));
+	F.insert(std::pair<std::string, uint64_t>("read@plt-0x10", 0x080483c0));
+	F.insert(std::pair<std::string, uint64_t>("read@plt", 0x080483d0));
+	F.insert(std::pair<std::string, uint64_t>("printf", 0x080483e0));
+	F.insert(std::pair<std::string, uint64_t>("lseek", 0x080483f0));
+	F.insert(std::pair<std::string, uint64_t>("puts", 0x08048400));
+	F.insert(std::pair<std::string, uint64_t>("__gmon_start__", 0x08048410));
+	F.insert(std::pair<std::string, uint64_t>("__libc_start_main", 0x08048430));
+	F.insert(std::pair<std::string, uint64_t>("write", 0x08048440));
+	F.insert(std::pair<std::string, uint64_t>("close", 0x08048450));
 
 	I.insert(pair<std::string, ImportedFunctions>("GLIBC_2_0", F));
 	Imports::iterator st = I.find("GLIBC_2_0");
