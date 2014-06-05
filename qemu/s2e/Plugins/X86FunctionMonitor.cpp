@@ -85,12 +85,12 @@ void X86FunctionMonitor::slotTranslateBlockEnd(ExecutionSignal *signal,
                                       TranslationBlock *tb,
                                       uint64_t pc, bool, uint64_t)
 {
-	s2e()->getDebugStream() << "X86FunctionMonitor: slotTranslateBlockEnd!!!" << '\n';
+	//s2e()->getDebugStream() << "X86FunctionMonitor: slotTranslateBlockEnd!!!" << '\n';
 	/* We intercept all call and ret translation blocks */
     if (tb->s2e_tb_type == TB_CALL || tb->s2e_tb_type == TB_CALL_IND) {
         signal->connect(sigc::mem_fun(*this,
                             &X86FunctionMonitor::slotCall));
-	s2e()->getDebugStream() << "X86FunctionMonitor: slotCall Connected!!!" << '\n';
+	//s2e()->getDebugStream() << "X86FunctionMonitor: slotCall Connected!!!" << '\n';
     }
 }
 
@@ -211,7 +211,7 @@ void X86FunctionMonitorState::slotCall(S2EExecutionState *state, uint64_t pc)
 {
     target_ulong cr3 = state->getPid();
     target_ulong eip = state->getPc();
-	m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: slotCall triggered!!!" << '\n';
+	//m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: slotCall triggered!!!" << '\n';
     if (!m_newCallDescriptors.empty()) {
         m_callDescriptors.insert(m_newCallDescriptors.begin(), m_newCallDescriptors.end());
         m_newCallDescriptors.clear();
@@ -228,7 +228,7 @@ void X86FunctionMonitorState::slotCall(S2EExecutionState *state, uint64_t pc)
             }
             if(it->second.cr3 == (uint64_t)-1 || it->second.cr3 == cr3) {
                 cd.signal.emit(state, this);
-				m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: cd.signal.emitted!!!" << '\n';
+				//m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: cd.signal.emitted!!!" << '\n';
             }
         }
         if (!m_newCallDescriptors.empty()) {
@@ -250,7 +250,7 @@ void X86FunctionMonitorState::slotCall(S2EExecutionState *state, uint64_t pc)
             }
             if(it->second.cr3 == (uint64_t)-1 || it->second.cr3 == cr3) {
                 cd.signal.emit(state, this);
-				m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: cd.signal.emitted too!!!" << '\n';
+				//m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: cd.signal.emitted too!!!" << '\n';
             }
         }
         if (!m_newCallDescriptors.empty()) {
@@ -304,7 +304,7 @@ void X86FunctionMonitorState::slotRet(S2EExecutionState *state, uint64_t pc, boo
     target_ulong cr3 = state->readCpuState(CPU_OFFSET(cr[3]), 8*sizeof(target_ulong));
     target_ulong esp;
 
-   	m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: In the slotRet!!!" << '\n';
+   	//m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: In the slotRet!!!" << '\n';
 
     bool ok = state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_ESP]),
                                              &esp, sizeof(target_ulong));
