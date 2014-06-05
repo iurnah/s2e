@@ -245,7 +245,7 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDI]), &(s.edi), sizeof (uint32_t) );
 	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBP]), &(s.ebp), sizeof (uint32_t) );
 	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESP]), &(s.esp), sizeof (uint32_t) );
-
+/*
 	if (eax != 0xFFFFFFFF)
 	{
 		std::map<int, SyscallSignal>::iterator itr = plgState->m_signals.find(eax);
@@ -255,8 +255,9 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 			itr->second.emit(state, pc, syscall_type, eax, signal);
 		}
 	}
-
+	
 	plgState->m_allSyscallsSignal.emit(state, pc, syscall_type, eax, signal);
+*/
 
 	s2e()->getDebugStream(state) << "PID=" << hexval(cr3) << ", PC=" << hexval(pc) << ", SYSCALLNO:" << eax << " = "  
 			<< getSyscallInformation(eax).name << ", (argN=" << getSyscallInformation(eax).argcount << ") " << "\n" << "***************  "

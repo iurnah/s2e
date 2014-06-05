@@ -114,7 +114,7 @@ void LibraryCallMonitor::onModuleLoad(
             return;
         }
     }
-	s2e()->getDebugStream() << "LibraryCallMonitor: onModuleLoad is called!!!" << '\n';
+	//s2e()->getDebugStream() << "LibraryCallMonitor: onModuleLoad is called!!!" << '\n';
     DECLARE_PLUGINSTATE(LibraryCallMonitorState, state);
 
     foreach2(it, imports.begin(), imports.end()) {
@@ -136,7 +136,7 @@ void LibraryCallMonitor::onModuleLoad(
             X86FunctionMonitor::CallSignal *cs = m_functionMonitor->getCallSignal(state, address, module.Pid);
             cs->connect(sigc::mem_fun(*this, &LibraryCallMonitor::onFunctionCall));
 
-			s2e()->getDebugStream() << "LibraryCallMonitor: onFunctionCall is connected!!!" << '\n';
+			//s2e()->getDebugStream() << "LibraryCallMonitor: onFunctionCall is connected!!!" << '\n';
         }
     }
 }
