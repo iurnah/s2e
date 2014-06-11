@@ -199,7 +199,16 @@ void MemoryAnalyzer::onDataMemoryAccess(S2EExecutionState *state,
         m_memoryMonitor.disconnect();
         return;
     }
+		
+	s2e()->getWarningsStream() << "S=" << std::dec << state->getID() << " P=0x" << std::hex << state->getPid();
+			<< " PC=0x" << std::hex << state->getPc() << " ---R4" << "[0x" << std::hex << address << "]=0x"
+			<< std::setw(10) << std::setfill('0') << value << "HostAddress:" << std::hex << hostAddress << '\n';
 
+/*
+	s2e()->getWarningsStream() << "S=" << std::dec << hdr.stateId << " P=0x" << std::hex << hdr.pid 
+			<< " PC=0x" << std::hex << te->pc << " " << type << (int)te->size 
+			<< "[0x" << std::hex << te->address << "]=0x" << std::setw(10) << std::setfill('0') << te->value;
+*/
     traceDataMemoryAccess(state, address, hostAddress, value, isWrite, isIO);
 }
 
