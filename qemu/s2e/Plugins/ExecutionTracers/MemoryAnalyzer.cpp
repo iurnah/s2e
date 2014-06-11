@@ -201,8 +201,8 @@ void MemoryAnalyzer::onDataMemoryAccess(S2EExecutionState *state,
     }
 		
 	s2e()->getWarningsStream() << "S=" << state->getID() << " P=0x" << hexval(state->getPid())
-			<< " PC=0x" << std::hex << state->getPc() << " ---R4" << "[0x" << std::hex << address << "]=0x"
-			<< std::setw(10) << std::setfill('0') << value << "HostAddress:" << std::hex << hostAddress << '\n';
+			<< " PC=0x" << hexval(state->getPc()) << " ---R4" << "[0x" << hexval(address) << "]=0x"
+			<< value << "HostAddress:" << hexval(hostAddress) << '\n';
 
 /*
 	s2e()->getWarningsStream() << "S=" << std::dec << hdr.stateId << " P=0x" << std::hex << hdr.pid 
