@@ -183,6 +183,10 @@ void MemoryAnalyzer::traceDataMemoryAccess(S2EExecutionState *state,
     if (!(e.flags & EXECTRACE_MEM_HASHOSTADDR) && !(e.flags & EXECTRACE_MEM_OBJECTSTATE)) {
         strucSize -= (sizeof(e.hostAddress) + sizeof(e.concreteBuffer));
     }
+	
+	s2e()->getWarningsStream() << "S=" << state->getID() << " P=0x" << hexval(state->getPid())
+			<< " PC=0x" << hexval(state->getPc()) << " ---R4" << "[0x" << hexval(e.address) << "]=0x"
+			<< hexval(e.value) << "HostAddress:" << hexval(e.hostAddress) << '\n';
 
     m_tracer->writeData(state, &e, sizeof(e), TRACE_MEMORY);
 }
@@ -200,10 +204,7 @@ void MemoryAnalyzer::onDataMemoryAccess(S2EExecutionState *state,
         return;
     }
 		
-	s2e()->getWarningsStream() << "S=" << state->getID() << " P=0x" << hexval(state->getPid())
-			<< " PC=0x" << hexval(state->getPc()) << " ---R4" << "[0x" << hexval(address) << "]=0x"
-			<< value << "HostAddress:" << hexval(hostAddress) << '\n';
-
+	
 /*
 	s2e()->getWarningsStream() << "S=" << std::dec << hdr.stateId << " P=0x" << std::hex << hdr.pid 
 			<< " PC=0x" << std::hex << te->pc << " " << type << (int)te->size 
