@@ -184,6 +184,10 @@ void MemoryTracer::traceDataMemoryAccess(S2EExecutionState *state,
         strucSize -= (sizeof(e.hostAddress) + sizeof(e.concreteBuffer));
     }
 
+	s2e()->getWarningsStream() << "S= " << state->getID() << " P=0x" << hexval(state->getPid())
+			<< " PC=0x" << hexval(state->getPc()) << " ---R4" << "[0x" << hexval(e.address) << "]=0x"
+			<< hexval(e.value) << "HostAddress:" << hexval(e.hostAddress) << '\n';
+
     m_tracer->writeData(state, &e, sizeof(e), TRACE_MEMORY);
 }
 
