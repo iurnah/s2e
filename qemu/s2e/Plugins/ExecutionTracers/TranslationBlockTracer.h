@@ -68,8 +68,14 @@ private:
 
     sigc::connection m_tbStartConnection;
     sigc::connection m_tbEndConnection;
+	sigc::connection m_onLoadStoreConnection;
 
     bool m_flushTbOnChange;
+
+	void onLoadStoreInstruction(ExecutionSignal *signal,
+							S2EExecutionState *state, 
+							TranslationBlock *tb,
+							uint64_t pc, int dest, int src);
 
     void onModuleTranslateBlockStart(
             ExecutionSignal *signal,
@@ -110,6 +116,11 @@ private:
     void disableTracing();
     void onCustomInstruction(S2EExecutionState* state, uint64_t opcode);
 };
+
+
+void shadowMemoryInit(void);
+static void set_mem_ins_addr(uint32_t addr, uint32_t bytes);
+static uint32_t get_mem_ins_addr(uint32_t addr); 
 
 } // namespace plugins
 } // namespace s2e

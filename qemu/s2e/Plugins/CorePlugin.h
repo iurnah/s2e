@@ -121,6 +121,17 @@ public:
         return m_Timer;
     }
 
+	/** signal that is emitted on each mov instruction, direct addressing mode
+	 *  only
+	 */ 
+	sigc::signal<void, ExecutionSignal*, 
+            S2EExecutionState*,
+            TranslationBlock*,
+            uint64_t, /* block PC */
+			int, /* dest */
+			int  /* src  */>
+			onLoadStoreInstruction;
+
     /** Signal that is emitted on beginning and end of code generation
         for each QEMU translation block.
     */

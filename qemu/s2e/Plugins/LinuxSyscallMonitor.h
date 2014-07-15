@@ -83,6 +83,11 @@ public:
 	virtual ~LinuxSyscallMonitor();
 
 	void initialize();
+	void onGen_LoadStore(ExecutionSignal *signal,
+							S2EExecutionState *state, 
+							TranslationBlock *tb,
+							uint64_t pc, int dest, int src);
+
 	void onTranslateBlockEnd(ExecutionSignal *signal,
 	                                          S2EExecutionState *state,
 	                                          TranslationBlock *tb,

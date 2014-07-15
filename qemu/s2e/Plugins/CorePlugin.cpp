@@ -247,6 +247,36 @@ void s2e_on_translate_instruction_start(
     }
 }
 
+/* don't forget add them in the s2e_qemu.h file and include in the translate.c */
+void S2E_prop_reg_reg(S2E* s2e, S2EExecutionState* state,
+	TranslationBlock *tb, uint64_t pc, int dst, int src){
+
+	assert(state->isActive());
+	ExecutionSignal *signal = static_cast<ExecutionSignal *>(
+					tb->s2e_tb->executionSignals.back());
+	assert(signal->empty());
+		
+	try{
+		s2e->getCorePlugin()->onLoadStoreInstruction.emit(signal, state, tb, pc, dst, src);
+		if(!signal->empty()){
+				s2e_tcg_instrument_code(s2e, signal, pc);
+			tb->s2e_tb->executionSignals.push_back(new ExecutionSignal);
+		}
+	} catch (s2e::CpuExitException&){
+		s2e_longjmp(env->jmp_env, 1);
+	}
+}
+
+/*  
+void S2E_prop_addr_reg(){
+	
+}
+
+void S2E_prop_reg_addr(){
+
+}
+*/
+
 void s2e_on_translate_jump_start(
         S2E* s2e, S2EExecutionState* state,
         TranslationBlock *tb, uint64_t pc, int jump_type)

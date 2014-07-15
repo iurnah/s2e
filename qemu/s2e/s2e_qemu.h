@@ -102,6 +102,12 @@ void s2e_tcg_custom_instruction_handler(uint64_t arg);
 /** Called by the translator when a custom instruction is detected */
 void s2e_tcg_emit_custom_instruction(struct S2E* s2e, uint64_t arg);
 
+/** Called by cpu_gen_code() at the mov instruction, only direct addressing */
+void S2E_prop_reg_reg(
+		struct S2E* s2e, 
+		struct S2EExecutionState* state,
+		struct TranslationBlock *tb, uint64_t pc, int dst, int src);
+
 /** Called by cpu_gen_code() at the beginning of translation process */
 void s2e_on_translate_block_start(
         struct S2E* s2e,

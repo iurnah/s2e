@@ -177,8 +177,17 @@ static inline void s2e_translate_compute_reg_mask_end(DisasContext *dc)
 
     dc->done_reg_access_end = 1;
 }
-
 #endif
+
+typedef struct Lea {
+	int mod;
+	int reg;
+	int rm;
+	int scale;
+	int index;
+	int base;
+	int disp;
+}LEA;
 
 static void gen_eob(DisasContext *s);
 static void gen_jmp(DisasContext *s, target_ulong eip);
@@ -2342,6 +2351,281 @@ static void gen_ldst_modrm(DisasContext *s, int modrm, int ot, int reg, int is_s
     }
 }
 
+/* general wrapper function for passing instruction info to s2e */
+/* what this function does, it take care of the cases such as the followign
+ * addressing mode:
+ * mov <reg>, <reg>
+ * mov <reg>, <mem>
+ * mov <mem>, <reg>
+ */
+#ifdef CONFIG_S2E
+static void S2E_gen_ldst_modrm(DisasContext *s, int modrm, int ot, int reg, int is_store)
+{
+    //int mod, rm, opreg, disp;
+    int mod, rm;
+	//LEA address;
+
+    mod = (modrm >> 6) & 3;
+    rm = (modrm & 7) | REX_B(s);
+    if (mod == 3) { /* directly addressing mov rm, reg; mov reg, rm;  */
+        if (is_store) {
+           /* 
+			if (reg != OR_TMP0)
+                gen_op_mov_TN_reg(ot, 0, reg);
+            gen_op_mov_reg_T0(ot, rm);
+		   */	
+			S2E_prop_reg_reg(g_s2e, g_s2e_state, s->tb, s->insPc, rm, reg);
+        } else {
+			/*
+            gen_op_mov_TN_reg(ot, 0, rm);
+            if (reg != OR_TMP0)
+                gen_op_mov_reg_T0(ot, reg);
+			*/
+			S2E_prop_reg_reg(g_s2e, g_s2e_state, s->tb, s->insPc, reg, rm);
+        }
+    } else { /* all the indrectly addressing mode */
+		/*
+        S2E_gen_lea_modrm(s, modrm, &opreg, &disp, address);
+		mem = address->getAddr();
+        if (is_store) {
+            if (reg != OR_TMP0)
+                gen_op_mov_TN_reg(ot, 0, reg);
+            gen_op_st_T0_A0(ot + s->mem_index);
+
+			//S2E_prop_addr_reg(addr, reg);
+        } else {
+            gen_op_ld_T0_A0(ot + s->mem_index);
+            if (reg != OR_TMP0)
+                gen_op_mov_reg_T0(ot, reg);
+			
+			//S2E_prop_reg_addr(reg, addr);
+        }
+		*/
+    }
+}
+#endif
+
+#if 0
+/* This function is to calculate the address based on the syntax of LEA.
+ * Please note it only calculate the address and return the address value to the
+ * caller, only in the caller we'll take care of passing the address to S2E. 
+ */
+static void S2E_gen_lea_modrm(DisasContext *s, int modrm, int *reg_ptr, int *offset_ptr, LEA *address)
+{
+    target_long disp;
+    int havesib;
+    int base;
+    int index;
+    int scale;
+    int opreg;
+    int mod, rm, code, override, must_add_seg;
+
+    override = s->override;
+    must_add_seg = s->addseg;
+    if (override >= 0)
+        must_add_seg = 1;
+    mod = (modrm >> 6) & 3;
+    rm = modrm & 7;
+
+    if (s->aflag) {
+
+        havesib = 0;
+        base = rm;
+        index = 0;
+        scale = 0;
+
+        if (base == 4) { //rm=100 have sib*/
+            havesib = 1;
+            code = ldub_code(s->pc++);
+            scale = (code >> 6) & 3;
+            index = ((code >> 3) & 7) | REX_X(s);
+            base = (code & 7);
+        }
+        base |= REX_B(s);
+
+        switch (mod) {
+        case 0:	/* indirect addressing, eax, [xxxx] */
+            if ((base & 7) == 5) {/* 32bit disp*/
+                base = -1;
+                disp = (int32_t)ldl_code(s->pc); /* get 32bit disp */
+                s->pc += 4;
+                if (CODE64(s) && !havesib) {/* 64bit case, ignore */
+                    disp += s->pc + s->rip_offset;
+                }
+            } else {
+                disp = 0;
+            }
+            break;
+        case 1: /* get 8bit disp */
+            disp = (int8_t)ldub_code(s->pc++);
+            break;
+        default:
+        case 2: /* get 32bit disp */
+            disp = (int32_t)ldl_code(s->pc);
+            s->pc += 4;
+            break;
+        }
+
+        if (base >= 0) {
+            /* for correct popl handling with esp */
+            if (base == 4 && s->popl_esp_hack)
+                disp += s->popl_esp_hack;
+#ifdef TARGET_X86_64
+            if (s->aflag == 2) {
+                gen_op_movq_A0_reg(base);
+                if (disp != 0) {
+                    gen_op_addq_A0_im(disp);
+                }
+            } else
+#endif
+            {
+                gen_op_movl_A0_reg(base); 
+				address->base = base;
+                if (disp != 0){
+                    gen_op_addl_A0_im(disp);
+					address->disp = disp;
+				}
+				/* have [base+disp] as the base:see SIB Note 1 from the
+				 * ref.x86asm.net reference */
+            }
+        } else {
+#ifdef TARGET_X86_64
+            if (s->aflag == 2) {
+                gen_op_movq_A0_im(disp);
+            } else
+#endif
+            {
+                gen_op_movl_A0_im(disp); 
+				address->disp = disp;
+            }
+        }
+
+        /* index == 4 means no index */
+        if (havesib && (index != 4)) {
+#ifdef TARGET_X86_64
+            if (s->aflag == 2) {
+                gen_op_addq_A0_reg_sN(scale, index);
+            } else
+#endif
+            {
+                gen_op_addl_A0_reg_sN(scale, index);
+				/* have scale*index */
+				/* can return the address if scale*index exist*/
+				address->scale = scale;
+				address->index = index;
+            }
+        } 
+
+        if (must_add_seg) {
+            if (override < 0) {
+                if (base == R_EBP || base == R_ESP)
+                    override = R_SS;
+                else
+                    override = R_DS;
+            }
+#ifdef TARGET_X86_64
+            if (s->aflag == 2) {
+                gen_op_addq_A0_seg(override);
+            } else
+#endif
+            {
+                gen_op_addl_A0_seg(s, override);//TODO: This might give us a headache, solve it.
+            }
+        }
+    } else { /* this is the 16 bit mode addressing */
+        switch (mod) {//see the 16-bit ModR/M Byte table in ref.x86asm.net
+        case 0:
+            if (rm == 6) {
+                disp = lduw_code(s->pc);
+                s->pc += 2;
+                gen_op_movl_A0_im(disp);
+                rm = 0; /* avoid SS override */
+                goto no_rm;
+            } else {
+                disp = 0;
+            }
+            break;
+        case 1:
+            disp = (int8_t)ldub_code(s->pc++);
+            break;
+        default:
+        case 2:
+            disp = lduw_code(s->pc);
+            s->pc += 2;
+            break;
+        }/* you shoud find out why there is no mod = 3 case,
+			Because mod = 3 is direct addressing, */
+
+        switch(rm) {
+        case 0:
+            gen_op_movl_A0_reg(R_EBX);
+            gen_op_addl_A0_reg_sN(0, R_ESI);//BX+SI
+			address->base = R_EBX;
+			address->index = R_ESI;
+            break;
+        case 1:
+            gen_op_movl_A0_reg(R_EBX);
+            gen_op_addl_A0_reg_sN(0, R_EDI);
+			address->base = R_EBX;
+			address->index = R_EDI;
+
+            break;
+        case 2:
+            gen_op_movl_A0_reg(R_EBP);
+            gen_op_addl_A0_reg_sN(0, R_ESI);
+			address->base = R_EBP;
+			address->index = R_ESI;
+            break;
+        case 3:
+            gen_op_movl_A0_reg(R_EBP);
+            gen_op_addl_A0_reg_sN(0, R_EDI);
+			address->base = R_EBP;
+			address->index = R_EDI;
+            break;
+        case 4:
+            gen_op_movl_A0_reg(R_ESI);
+			address->base = R_ESI;
+            break;
+        case 5:
+            gen_op_movl_A0_reg(R_EDI);
+			address->base = R_EDI; 
+            break;
+        case 6:
+            gen_op_movl_A0_reg(R_EBP);
+			address->base = R_EBP;
+            break;
+        default:
+        case 7:
+            gen_op_movl_A0_reg(R_EBX);
+			address->base = R_EBX;
+            break;
+        }
+        if (disp != 0){
+            gen_op_addl_A0_im(disp);
+			address->disp = disp;	
+		}
+        gen_op_andl_A0_ffff();
+    no_rm:
+        if (must_add_seg) {
+            if (override < 0) {
+                if (rm == 2 || rm == 3 || rm == 6)
+                    override = R_SS;
+                else
+                    override = R_DS;
+            }
+            gen_op_addl_A0_seg(s, override);
+			/* here might be a problem */
+        }
+    }
+
+    opreg = OR_A0;
+    disp = 0;
+    *reg_ptr = opreg;
+    *offset_ptr = disp;
+
+}
+#endif
+
 static inline uint32_t insn_get(DisasContext *s, int ot)
 {
     uint32_t ret;
@@ -4195,6 +4479,9 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
     int modrm, reg, rm, mod, reg_addr, op, opreg, offset_addr, val;
     target_ulong next_eip, tval;
     int rex_w, rex_r;
+#ifdef CONFIG_S2E
+	//LEA address;
+#endif
 
 #if defined(CONFIG_S2E)
 #elif defined(CONFIG_LLVM)
@@ -5220,15 +5507,18 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         /**************************/
         /* mov */
     case 0x88:
-    case 0x89: /* mov Gv, Ev */
+    case 0x89: /* mov Gv, Ev [MOV R/M, R]*/
         if ((b & 1) == 0)
             ot = OT_BYTE;
         else
             ot = dflag + OT_WORD;
         modrm = ldub_code(s->pc++);
         reg = ((modrm >> 3) & 7) | rex_r;
-
-        /* generate a generic store */
+		/* Here send back to S2E plugins */
+#ifdef CONFIG_S2E
+		S2E_gen_ldst_modrm(s, modrm, ot, reg, 1);
+#endif
+    /* generate a generic store */
         gen_ldst_modrm(s, modrm, ot, reg, 1);
         break;
     case 0xc6:
@@ -5242,6 +5532,9 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         if (mod != 3) {
             s->rip_offset = insn_const_size(ot);
             gen_lea_modrm(s, modrm, &reg_addr, &offset_addr);
+#ifdef CONFIG_S2E
+			//S2E_gen_lea_modrm(s, modrm, &reg_addr, &offset_addr, &address);
+#endif
         }
         val = insn_get(s, ot);
         gen_op_movl_T0_im(val);
@@ -5251,7 +5544,7 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
             gen_op_mov_reg_T0(ot, (modrm & 7) | REX_B(s));
         break;
     case 0x8a:
-    case 0x8b: /* mov Ev, Gv */
+    case 0x8b: /* mov Ev, Gv [MOV R, R/M] */
         if ((b & 1) == 0)
             ot = OT_BYTE;
         else

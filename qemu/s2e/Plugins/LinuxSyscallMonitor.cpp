@@ -48,9 +48,13 @@ void LinuxSyscallMonitor::initialize()
 
 	m_detector = static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));  // add by sun for special module
 	s2e()->getCorePlugin()->onTranslateBlockEnd.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateBlockEnd));
+
+	//s2e()->getCorePlugin()->onGen_LoadStore.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onGen_LoadStore));
+
 //	s2e()->getCorePlugin()->onTranslateJumpStart.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateJumpStart));
 	m_detector->onModuleLoad.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onModuleLoad));     //add by sun for special module
 
+	
 	m_initialized = false;
 	s2e()->getDebugStream() << "LinuxSyscallMonitor: Plugin initialized!!!" << '\n';
 }
@@ -60,6 +64,18 @@ void LinuxSyscallMonitor::onModuleLoad( S2EExecutionState* state, const ModuleDe
 {
 	spe_pid = module.Pid;
 }
+
+#if 0
+/* member function to receive the source and destination operator */
+void LinuxSyscallMonitor::onGen_LoadStore(ExecutionSignal *signal,
+				S2EExecutionState *state, 
+				TranslationBlock *tb,
+				uint64_t pc, int dest, int src){
+
+	s2e()->getDebugStream() << "WE HAVE THE onGen_LoadStore(): PC = " << pc << " dest = " << dest << " src = " << src << '\n';
+
+}
+#endif
 
 void LinuxSyscallMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
                                           S2EExecutionState *state,

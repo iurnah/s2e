@@ -55,6 +55,80 @@ S2E_DEFINE_PLUGIN(TranslationBlockTracer, "Tracer for executed translation block
 					"ExecutionTracer",
 					"ModuleExecutionDetector");
 
+struct X86State {
+   uint32_t eax;
+   uint32_t ecx;
+   uint32_t edx;
+   uint32_t ebx;
+   uint32_t esi;
+   uint32_t edi;
+   uint32_t ebp;
+   uint32_t esp;
+   uint32_t eip;
+   uint32_t cr2;
+}s;
+
+const char *RegSymbol[] = { "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI" };
+
+/* shadow memory parameters */
+#define PAGE_SIZE 65536 //2^16
+#define PAGE_NUM 262144 //2^18
+#define SHADOW_BYTES 4
+#define TAG_INVALID 0xDEADBEEF
+#define SEG_MASK 0x3fffffff//0xC0000000
+#define PAGE_NUM_BITS 16
+#define OFF_SET_BITS 14
+#define ADDR_MIN 4294967290//3147483640//16376 //for test
+#define ADDR_MAX 4294967295//3147483648//16385 //for test
+/*
+ * virtual address used to query shadow memory 
+ *            32bit virtual address
+         --------------------------------
+         SG| pg_num=16bit |off_set=14bit|
+         --------------------------------
+ */
+typedef struct {
+	uint32_t page[PAGE_SIZE/SHADOW_BYTES];
+} shadowPage;
+
+static shadowPage s_page;
+static shadowPage *shadowMemory[4][PAGE_NUM/SHADOW_BYTES];
+
+void shadowMemoryInit(void)
+{
+	int32_t i, j;
+	//int size;	
+
+	for(i = 0; i < PAGE_SIZE/SHADOW_BYTES; i++)
+		s_page.page[i] = TAG_INVALID;	
+
+	for(j = 0; j < 4; j++)
+		for(i = 0; i < PAGE_NUM/SHADOW_BYTES; i++){
+			shadowMemory[j][i] = &s_page;
+		}
+}
+
+/** get the 32 bit shadow memory contents for the addresss in the shadow memory */
+static uint32_t get_mem_ins_addr(uint32_t addr) 
+{
+	shadowPage *sm;
+	sm = shadowMemory[addr >> (PAGE_NUM_BITS + OFF_SET_BITS)][(addr & SEG_MASK) >> OFF_SET_BITS ];
+
+	uint32_t sm_off = addr & 0x3FFF;
+	//cout << sm_off << endl;
+	return (sm->page)[sm_off];
+}
+
+/** set the 32 bit shadow memory contents for the addresss in the shadow memory */
+static void set_mem_ins_addr(uint32_t addr, uint32_t bytes)
+{
+	shadowPage *sm;
+	sm = shadowMemory[addr >> (PAGE_NUM_BITS + OFF_SET_BITS)][(addr & SEG_MASK) >> OFF_SET_BITS ];
+	uint32_t sm_off = addr & 0x3FFF;
+	//cout << sm_off << endl;
+	(sm->page)[sm_off] = bytes;
+}
+
 void TranslationBlockTracer::initialize()
 {
     m_tracer = (ExecutionTracer *)s2e()->getPlugin("ExecutionTracer");
@@ -85,12 +159,14 @@ void TranslationBlockTracer::enableTracing()
     }
 
     m_tbStartConnection = m_detector->onModuleTranslateBlockStart.connect(
-            sigc::mem_fun(*this, &TranslationBlockTracer::onModuleTranslateBlockStart)
-    );
+            sigc::mem_fun(*this, &TranslationBlockTracer::onModuleTranslateBlockStart));
 
     m_tbEndConnection = m_detector->onModuleTranslateBlockEnd.connect(
-            sigc::mem_fun(*this, &TranslationBlockTracer::onModuleTranslateBlockEnd)
-    );
+            sigc::mem_fun(*this, &TranslationBlockTracer::onModuleTranslateBlockEnd));
+#if 0
+	m_onLoadStroeConnection = s2e()->getCorePlugin()->onLoadStoreInstruction.connect(
+			sigc::mem_fun(*this, &TranslationBlockTracer::onLoadStoreInstruction));
+#endif
 }
 
 void TranslationBlockTracer::disableTracing()
@@ -101,8 +177,19 @@ void TranslationBlockTracer::disableTracing()
 
     m_tbStartConnection.disconnect();
     m_tbEndConnection.disconnect();
+	//m_onLoadStoreConnection.disconnect();
 }
+#if 0
+/* member function to receive the source and destination operator */
+void TranslationBlockTracer::onGen_LoadStore(ExecutionSignal *signal,
+				S2EExecutionState *state, 
+				TranslationBlock *tb,
+				uint64_t pc, int dest, int src){
 
+	s2e()->getDebugStream() << "WE HAVE THE onGen_LoadStore(): PC = " << pc << " dest = " << dest << " src = " << src << '\n';
+
+}
+#endif
 
 void TranslationBlockTracer::onModuleTranslateBlockStart(
         ExecutionSignal *signal,
@@ -167,6 +254,7 @@ void TranslationBlockTracer::trace(S2EExecutionState *state, uint64_t pc, ExecTr
 
 }
 
+#if 0
 void TranslationBlockTracer::onExecuteBlockStart(S2EExecutionState *state, uint64_t pc)
 {
     trace(state, pc, TRACE_TB_START);
@@ -174,6 +262,68 @@ void TranslationBlockTracer::onExecuteBlockStart(S2EExecutionState *state, uint6
 
 void TranslationBlockTracer::onExecuteBlockEnd(S2EExecutionState *state, uint64_t pc)
 {
+    trace(state, pc, TRACE_TB_END);
+}
+#endif
+
+void TranslationBlockTracer::onExecuteBlockStart(S2EExecutionState *state, uint64_t pc)
+{
+    trace(state, pc, TRACE_TB_START);
+	/* get the register value at the very begining of the each translation block
+	 * execution or get the register value at each onPropagation.*/
+
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EAX]), &(s.eax), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDX]), &(s.edx), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESP]), &(s.esp), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBP]), &(s.ebp), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESI]), &(s.esi), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDI]), &(s.edi), sizeof (uint32_t) );
+
+	s2e()->getDebugStream(state) << "[per block]PC = " << hexval(pc) 
+			<< " EAX = " << hexval(s.eax) << " ECX = " << hexval(s.ecx) 
+			<< " EDX = " << hexval(s.edx) << " EBX = " << hexval(s.ebx) 
+			<< " ESP = " << hexval(s.esp) << " EBP = " << hexval(s.ebp) 
+			<< " ESI = " << hexval(s.esi) << " EDI = " << hexval(s.edi) << '\n';
+
+	m_onLoadStoreConnection = s2e()->getCorePlugin()->onLoadStoreInstruction.connect(sigc::mem_fun(*this, &TranslationBlockTracer::onLoadStoreInstruction));
+
+}
+
+void TranslationBlockTracer::onLoadStoreInstruction(ExecutionSignal *signal,
+				S2EExecutionState *state, 
+				TranslationBlock *tb,
+				uint64_t pc, int dest, int src){
+	/* We can also read the register value at this point, this is good for
+	 * analysis and better then reading at the very begining of each execution
+	 * block */
+	
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EAX]), &(s.eax), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDX]), &(s.edx), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESI]), &(s.esi), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDI]), &(s.edi), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBP]), &(s.ebp), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESP]), &(s.esp), sizeof (uint32_t) );
+
+	s2e()->getDebugStream(state) << "[per insn]PC = " << hexval(pc) << "EAX = " << hexval(s.eax) << " EBX = " << hexval(s.ebx) << " ECX = " << hexval(s.ecx) << " EDX = " << hexval(s.edx) << " ESI = " << hexval(s.esi) << " EDI = " << hexval(s.edi) << " EBP = " << hexval(s.ebp) << " ESP = " << hexval(s.esp) << '\n';
+
+	s2e()->getDebugStream() << "Data Propagation: " << RegSymbol[src] << " --> " << RegSymbol[dest] << '\n';
+	//TODO: Insert the analysis code and the shadow memory code here	
+	set_mem_ins_addr(s.esp, -1);	
+	set_mem_ins_addr(s.ebp, -1);
+
+	s2e()->getDebugStream(state) << "SHADOW MEMORY: " << get_mem_ins_addr(s.esp) << '\n';
+}
+
+void TranslationBlockTracer::onExecuteBlockEnd(S2EExecutionState *state, uint64_t pc)
+{
+	/* We disconnect */
+	m_onLoadStoreConnection.disconnect();
+	s2e()->getDebugStream(state) << "onLoadStoreInstruction disconnected!!!" << '\n';
+
     trace(state, pc, TRACE_TB_END);
 }
 
