@@ -64,6 +64,8 @@ public:
     };
 
 private:
+	typedef std::multimap<uint32_t, uint64_t> overWrittenAddressesId;
+
     bool m_monitorPageFaults;
     bool m_monitorTlbMisses;
     bool m_monitorMemory;
@@ -86,6 +88,8 @@ private:
     ExecutionTracer *m_tracer;
     ModuleExecutionDetector *m_execDetector;
 
+	overWrittenAddressesId m_overWrittenAddressesId;
+
     void onTlbMiss(S2EExecutionState *state, uint64_t addr, bool is_write);
     void onPageFault(S2EExecutionState *state, uint64_t addr, bool is_write);
 
@@ -104,6 +108,11 @@ private:
     void onModuleTransition(S2EExecutionState *state,
                             const ModuleDescriptor *prevModule,
                             const ModuleDescriptor *nextModule);
+
+	/* this function is to collect all the overwritten memory address that
+	 * export to library monitor and syscall monitor */
+	void overWrittenAddressesCollection(S2EExecutionState *state, 
+										uint64_t address, uint8_t flags);
 public:
     //May be called directly by other plugins
     void traceDataMemoryAccess(S2EExecutionState *state,
@@ -111,6 +120,8 @@ public:
                                    klee::ref<klee::Expr> &hostAddress,
                                    klee::ref<klee::Expr> &value,
                                    bool isWrite, bool isIO);
+
+	bool checkOverWrittenAddressesById(uint32_t stateId, uint64_t address);
 };
 
 

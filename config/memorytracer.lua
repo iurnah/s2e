@@ -11,25 +11,107 @@ s2e = {
 }
 
 plugins = {
-  "BaseInstructions",
+  "BaseInstructions", 	--Enable S2E custom opcodes, enough to run the symbolic execution
+  "RawMonitor", 	-- Track when the guest loads and unloads modules
+  "ModuleExecutionDetector", -- Detect when execution enters the program of interest
+  "CodeSelector", 	-- Restrict symbolic execution to the programs of interest
+ 
   "ExecutionTracer",
   "ModuleTracer",
-
-  "RawMonitor",
-  "ModuleExecutionDetector",
-
-  --"FunctionMonitor",
   "MemoryTracer",
+  "TranslationBlockTracer", 
+  "StateSwitchTracer",
   "TestCaseGenerator",
-  "TranslationBlockTracer",
-  
-  "CodeSelector",
 
-  --"HostFiles",
-  --"Annotation",
+  "X86FunctionMonitor",
+  "LibraryCallMonitor",
+
+  "HostFiles",
 }
 
+
 pluginsConfig = {}
+
+pluginsConfig.MemoryTracer = { --same
+	monitorMemory = true,
+	monitorModules = true,
+}
+
+pluginsConfig.ModuleTracer = { }
+
+pluginsConfig.TranslationBlockTracer = { }
+
+pluginsConfig.RawMonitor = {
+  kernelStart = 0xC0000000
+}
+
+pluginsConfig.CodeSelector = {
+	moduleIds = { "prog2", "init_env.so" }
+	-- as long match the ModuleExecutionDetector, it is ok.
+}
+
+pluginsConfig.HostFiles = {
+	baseDirs = { "/home/rui/Research/SymbolicExecution/guest-prog/" }
+}
+
+pluginsConfig.TestCaseGenerator = {}
+
+pluginsConfig.ModuleExecutionDetector = {
+  init_env_id = { --have to remove the dot here and to process in the assignement process.
+    moduleName = "init_env.so",
+    kernelMode = false,
+  },
+  prog2 = {
+    moduleName = "prog2",
+    kernelMode = false,	
+  },
+  trackAllModules = true,
+  configureAllModules = false  
+}
+
+pluginsConfig.X86FunctionMonitor = {
+
+}
+
+pluginsConfig.LibraryCallMonitor = {
+
+}
+
+pluginsConfig.MemoryChecker = {}
+
+--[[
+pluginsConfig = {}
+
+pluginsConfig.RawMonitor = {
+  kernelStart = 0xC0000000,
+  prog1_id = {
+        delay = false,-- False, RawMonitor considers the module to be loaded when S2E starts.
+        name = "prog1", 
+        start = 0x080483cc,	--From the guset objdump -h prog1 (start address 0x080483cc)
+        size = 5147,		--From the guest stat prog1
+        nativebase = 0x8048360, --.text, at <main>
+        kernelmode = false
+  }
+}
+
+pluginsConfig.ModuleExecutionDetector = {
+  init_env = {
+    moduleName = "init_env.so",
+    kernelMode = false,
+  },
+
+  prog1_id = {
+    moduleName = "prog1",
+    kernelMode = false,	
+  },
+
+  trackAllModules = false,
+  configureAllModules = false  
+}
+
+pluginsConfig.CodeSelector = {
+	moduleIds = { "prog1_id" }
+}
 
 pluginsConfig.MemoryTracer = {
 	monitorMemory = true,
@@ -42,30 +124,18 @@ pluginsConfig.TranslationBlockTracer = {
 
 }
 
-pluginsConfig.RawMonitor = {
-  kernelStart = 0xC0000000
-}
-
-pluginsConfig.CodeSelector = {
-	moduleIds = {"open_id"}
-}
 
 pluginsConfig.HostFiles = {
-	baseDirs = { "/home/rui/s2e/myProg" }
+	baseDirs = { "/home/rui/Research/SymbolicExecution/guest-prog/" }
 }
 
 pluginsConfig.TestCaseGenerator = {}
 
-pluginsConfig.ModuleExecutionDetector = {
-  open_id = {
-    moduleName = "open",
-    kernelMode = false,
-  },
-  trackAllModules = false,
-  configureAllModules = false  
-}
+
 
 pluginsConfig.MemoryChecker = {}
+
+]]--
 
 --[[
 pluginsConfig.RawMonitor = {
@@ -88,5 +158,3 @@ pluginsConfig.CodeSelector = {
 }
 
 --]]
- 
-

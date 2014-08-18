@@ -104,7 +104,7 @@ void ModuleExecutionDetector::initialize()
         sigc::mem_fun(*this, &ModuleExecutionDetector::onTranslateBlockStart));
 
     s2e()->getCorePlugin()->onTranslateBlockEnd.connect(
-            sigc::mem_fun(*this, &ModuleExecutionDetector::onTranslateBlockEnd));
+        sigc::mem_fun(*this, &ModuleExecutionDetector::onTranslateBlockEnd));
 
     s2e()->getCorePlugin()->onException.connect(
         sigc::mem_fun(*this, &ModuleExecutionDetector::exceptionListener));
@@ -136,7 +136,10 @@ void ModuleExecutionDetector::initializeConfiguration()
         ModuleExecutionCfg d;
         std::stringstream s;
         s << getConfigKey() << "." << *it << ".";
-        d.id = *it;
+		if(*it == "init_env_id")
+	        d.id = "init_env.so";
+		else
+			d.id = *it;
 
         bool ok = false;
         d.moduleName = cfg->getString(s.str() + "moduleName", "", &ok);
@@ -155,6 +158,7 @@ void ModuleExecutionDetector::initializeConfiguration()
         s2e()->getDebugStream() << "ModuleExecutionDetector: " <<
                 "id=" << d.id << " " <<
                 "moduleName=" << d.moduleName << " " <<
+				"kernelMode=" << d.kernelMode << " " <<
                 "context=" << d.context  << '\n';
 
         if (m_ConfiguredModulesName.find(d) != m_ConfiguredModulesName.end()) {
@@ -174,6 +178,7 @@ void ModuleExecutionDetector::initializeConfiguration()
         m_ConfiguredModulesName.insert(d);
     }
 }
+
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
@@ -185,24 +190,24 @@ bool ModuleExecutionDetector::opAddModuleConfigEntry(S2EExecutionState *state)
 
     ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_ECX]), &moduleId, sizeof(moduleId));
     ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EAX]), &moduleName, sizeof(moduleName));
-    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EBX]), &isKernelMode, sizeof(isKernelMode));
+    ok &= state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EDX]), &isKernelMode, sizeof(isKernelMode));
 
     if(!ok) {
         s2e()->getWarningsStream(state)
-            << "ModuleExecutionDetector: Could not read parameters.\n";
+            << "ModuleExecutionDetector(op): Could not read parameters.\n";
         return false;
     }
 
     std::string strModuleId, strModuleName;
-    if (!state->readString(moduleId, strModuleId)) {
+    if (!state->readString(moduleId, strModuleId)) {//moduleId is from init_env.c
         s2e()->getWarningsStream(state)
-            << "ModuleExecutionDetector: Could not read the module id string.\n";
+            << "ModuleExecutionDetector(op): Could not read the module id string.\n";
         return false;
     }
 
     if (!state->readString(moduleName, strModuleName)) {
         s2e()->getWarningsStream(state)
-            << "ModuleExecutionDetector: Could not read the module name string.\n";
+            << "ModuleExecutionDetector(op): Could not read the module name string.\n";
         return false;
     }
 
@@ -211,21 +216,21 @@ bool ModuleExecutionDetector::opAddModuleConfigEntry(S2EExecutionState *state)
     desc.moduleName = strModuleName;
     desc.kernelMode = (bool) isKernelMode;
 
-    s2e()->getMessagesStream() << "ModuleExecutionDetector(opAdd): Adding module " <<
+    s2e()->getMessagesStream(state) << "ModuleExecutionDetector(op): Adding module " <<
             "id=" << desc.id <<
             " moduleName=" << desc.moduleName <<
             " kernelMode=" << desc.kernelMode << "\n";
 
     if (m_ConfiguredModulesName.find(desc) != m_ConfiguredModulesName.end()) {
-        s2e()->getWarningsStream() << "ModuleExecutionDetector(opAdd): " <<
-                "module name " << desc.moduleName << " already exists\n";
+        s2e()->getWarningsStream(state) << "ModuleExecutionDetector(op): " <<
+                "module name [" << desc.moduleName << "] already add to m_ConfiguredModulesName by the configure script\n";
         return false;
     }
 
 
     if (m_ConfiguredModulesId.find(desc) != m_ConfiguredModulesId.end()) {
-        s2e()->getWarningsStream() << "ModuleExecutionDetector(opAdd): " <<
-                "module id " << desc.id << " already exists\n";
+        s2e()->getWarningsStream(state) << "ModuleExecutionDetector(op): " <<
+                "module id [" << desc.id << "] already add to m_ConfiguredModulesId by the configure script\n";
         return false;
     }
 
@@ -266,8 +271,6 @@ void ModuleExecutionDetector::onCustomInstruction(
 
 }
 
-
-
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
@@ -279,31 +282,38 @@ void ModuleExecutionDetector::moduleLoadListener(
     DECLARE_PLUGINSTATE(ModuleTransitionState, state);
 
     //If module name matches the configured ones, activate.
-    s2e()->getDebugStream() << "ModuleExecutionDetector: " <<
-            "Module "  << module.Name << " loaded - " <<
-            "Base=" <<  hexval(module.LoadBase) << " Size=" << hexval(module.Size);
+    s2e()->getDebugStream(state) << "ModuleExecutionDetector(OML): " <<
+            " Module "  << module.Name << " loaded; " << "Base=" <<  hexval(module.LoadBase) << 
+			" Size=" << hexval(module.Size) << '\n';
 
 
     ModuleExecutionCfg cfg;
     cfg.moduleName = module.Name;
 
+	/* Rui always make this false in the configureation file */
     if (m_ConfigureAllModules) {
         if (plgState->exists(&module, true)) {
-            s2e()->getDebugStream() << " [ALREADY REGISTERED]" << '\n';
+            s2e()->getDebugStream(state) << "ModuleExecutionDetector(OML): [ALREADY REGISTERED!]" << '\n';
         }else {
-            s2e()->getDebugStream() << " [REGISTERING]" << '\n';
+            s2e()->getDebugStream(state) << "ModuleExecutionDetector(OML): [REGISTERING...]" << '\n';
             plgState->loadDescriptor(module, true);
             onModuleLoad.emit(state, module);
         }
         return;
     }
 
+	/* m_ConfiguredModulesName is initialized during the initital process,
+	 * doing the if check is just find out whether the cfg passed from
+	 * RawMonitor is match the registered module throught
+	 * ModuleExecutionDetector's configuration file */
     ConfiguredModulesByName::iterator it = m_ConfiguredModulesName.find(cfg);
     if (it != m_ConfiguredModulesName.end()) {
-        if (plgState->exists(&module, true)) {
-            s2e()->getDebugStream() << " [ALREADY REGISTERED ID=" << (*it).id << "]" << '\n';
+        if (plgState->exists(&module, true)) {//This check will ensure the m_Descriptors have it.
+            s2e()->getDebugStream(state) << "ModuleExecutionDetector(OML): [ALREADY REGISTERED ID="
+				   << (*it).id << "]" << '\n';
         }else {
-            s2e()->getDebugStream() << " [REGISTERING ID=" << (*it).id << "]" << '\n';
+            s2e()->getDebugStream(state) << "ModuleExecutionDetector(OML): [REGISTERING ID=" 
+					<< (*it).id << "]" << '\n';
             plgState->loadDescriptor(module, true);
             onModuleLoad.emit(state, module);
 			//This onMoludeLoad is not from OSMonitor and it emit for other
@@ -313,7 +323,7 @@ void ModuleExecutionDetector::moduleLoadListener(
         return;
     }
 
-    s2e()->getDebugStream() << '\n';
+    s2e()->getDebugStream(state) << "Now get to TrackAllModule" << '\n';
 
     if (m_TrackAllModules) {
         if (!plgState->exists(&module, false)) {
@@ -334,7 +344,6 @@ void ModuleExecutionDetector::moduleUnloadListener(
 
     plgState->unloadDescriptor(module);
 }
-
 
 
 void ModuleExecutionDetector::processUnloadListener(
@@ -394,10 +403,14 @@ void ModuleExecutionDetector::onTranslateBlockStart(
     uint64_t pid = m_Monitor->getPid(state, pc);
 
     const ModuleDescriptor *currentModule =
-            plgState->getDescriptor(pid, pc);
-
+            plgState->getDescriptor(pid, pc);//getCurrentDescriptor?
+	//TODO: problem with getDescriptor implementation. Try to fix it.
     if (currentModule) {
         //S2E::printf(s2e()->getDebugStream(), "Translating block %#"PRIx64" belonging to %s\n",pc, currentModule->Name.c_str());
+		s2e()->getDebugStream() << "onTranslateBlockStart::currentModule: Pid=" << 
+				currentModule->Pid << " name=" << currentModule->Name << " PC=" << 
+				hexval(pc) << '\n';
+		
         signal->connect(sigc::mem_fun(*this,
             &ModuleExecutionDetector::onExecution));
 
@@ -492,21 +505,38 @@ void ModuleExecutionDetector::onExecution(
 {
     DECLARE_PLUGINSTATE(ModuleTransitionState, state);
 
-    const ModuleDescriptor *currentModule = getCurrentDescriptor(state);
+    //const ModuleDescriptor *currentModule = getCurrentDescriptor(state);
+	uint64_t pid = m_Monitor->getPid(state, pc);
+    const ModuleDescriptor *currentModule =
+            plgState->getDescriptor(pid, pc);
 
     //gTRACE("pid=%#"PRIx64" pc=%#"PRIx64"\n", pid, pc);
     if (plgState->m_PreviousModule != currentModule) {
-#if 0
+#if 1
+		std::string prev_name;
+		if(plgState->m_PreviousModule){
+			prev_name = plgState->m_PreviousModule->Name;
+		}else
+			prev_name = "NULL";
+
+		s2e()->getDebugStream(state) << "onExecution::Switch modules from " << 
+				prev_name << " to " << currentModule->Name << 
+				" PC=" << hexval(pc) << '\n';
+
         if (currentModule) {
-            s2e_debug_print("Entered module %s\n", currentModule->descriptor.Name.c_str());
-        }else {
-            s2e_debug_print("Entered unknown module\n");
+			s2e()->getDebugStream(state) << "onExecution::Entered module " << 
+					currentModule->Name << " PC=" << hexval(pc) << '\n';
+        }else { /* Rui: Module not registered with m_Descriptors */
+			s2e()->getDebugStream(state) << "onExecution::Entered unknown module, PC=" << hexval(pc)<< '\n';
         }
 #endif
         onModuleTransition.emit(state, plgState->m_PreviousModule, currentModule);
 
         plgState->m_PreviousModule = currentModule;
     }
+
+	//s2e_debug_print("Keep Execute same module\n");
+	s2e()->getDebugStream(state) << "onExecution::Keep Execute same module, PC=" << hexval(pc) << '\n';
 }
 
 void ModuleExecutionDetector::dumpMemory(S2EExecutionState *state,
@@ -549,7 +579,7 @@ void ModuleExecutionDetector::dumpMemory(S2EExecutionState *state,
 
 ModuleTransitionState::ModuleTransitionState()
 {
-    m_PreviousModule = NULL;
+    m_PreviousModule = NULL; //TODO: initial to a unknow module.
     m_CachedModule = NULL;
 }
 
@@ -575,6 +605,7 @@ ModuleTransitionState* ModuleTransitionState::clone() const
     foreach2(it, m_NotTrackedDescriptors.begin(), m_NotTrackedDescriptors.end()) {
         assert(*it != m_CachedModule && *it != m_PreviousModule);
         ret->m_NotTrackedDescriptors.insert(new ModuleDescriptor(**it));
+		//TODO shouldn't be make a pair fisrt then insert?
     }
 
     if (m_CachedModule) {
@@ -614,6 +645,7 @@ const ModuleDescriptor *ModuleTransitionState::getDescriptor(uint64_t pid, uint6
         }
     }
 
+	//TODO: change module, we have to return corresponding ModuleDescriptor
     ModuleDescriptor d;
     d.Pid = pid;
     d.LoadBase = pc;

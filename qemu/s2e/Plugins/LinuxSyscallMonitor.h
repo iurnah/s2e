@@ -11,6 +11,7 @@
 #include <s2e/Plugin.h>
 #include "CorePlugin.h"
 #include "InterruptMonitor.h"
+#include "./ExecutionTracers/MemoryTracer.h"
 #include "ModuleExecutionDetector.h"
 
 #include <vector>
@@ -73,6 +74,22 @@ public:
 		const char *arg5; 
 		const char *arg6; 
 	};
+
+	struct X86State {
+	   uint32_t eax;
+	   uint32_t ebx;
+	   uint32_t ecx;
+	   uint32_t edx;
+	   uint32_t esi;
+	   uint32_t edi;
+	   uint32_t ebp;
+	   uint32_t esp;
+	   uint32_t eip;
+	   uint32_t cr2;
+	}s;
+
+	typedef std::map<uint64_t, const char *> addrTypes;
+
 	typedef enum ESyscallType SyscallType;
 	typedef struct SSyscallInformation SyscallInformation;
 	typedef sigc::signal<void, S2EExecutionState*, uint64_t> SyscallReturnSignal;
@@ -98,11 +115,16 @@ public:
 	static const SyscallInformation& getSyscallInformation(int syscallNr);
 	SyscallSignal& getSyscallSignal(S2EExecutionState* state, int syscallNr);
 	SyscallSignal& getAllSyscallsSignal(S2EExecutionState* state);
+
+	//bool isPointer(uint32_t realParameters);
 protected:
 	void emitSyscallSignal(S2EExecutionState* state, uint64_t pc, SyscallType syscall_type, SyscallReturnSignal& signal);
 private:
 	static SyscallInformation m_syscallInformation[];
 	bool m_initialized;
+
+	MemoryTracer *m_MemoryTracer; //Rui: for checking the overWrittenAddresses
+
 	ModuleExecutionDetector *m_detector; //add by sun for track configured modules
 	void onModuleLoad(
 		S2EExecutionState* state,

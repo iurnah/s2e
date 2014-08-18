@@ -148,7 +148,6 @@ void RawMonitor::initialize()
 
     s2e()->getCorePlugin()->onCustomInstruction.connect(
             sigc::mem_fun(*this, &RawMonitor::onCustomInstruction));
-
 }
 
 /**********************************************************/
@@ -196,6 +195,7 @@ void RawMonitor::opLoadConfiguredModule(S2EExecutionState *state)
     }
 }
 
+/* To handle the configure from opcode in init_env.c, i.e. s2e_rawmon_loadmodule2() */
 void RawMonitor::opLoadModule(S2EExecutionState *state)
 {
     target_ulong pModuleConfig;
@@ -316,7 +316,6 @@ void RawMonitor::onCustomInstruction(S2EExecutionState* state, uint64_t opcode)
     }
 }
 
-
 /**********************************************************/
 /**********************************************************/
 /**********************************************************/
@@ -335,7 +334,8 @@ void RawMonitor::loadModule(S2EExecutionState *state, const Cfg &c, bool skipIfD
     md.EntryPoint = c.entrypoint;
 
     s2e()->getDebugStream() << "[loadModule] RawMonitor loaded " << c.name << " " <<
-            hexval(c.start) << ' ' << hexval(c.size) << '\n';
+            " Start = " << hexval(c.start) << ", " << " Size = " << hexval(c.size) << '\n';
+
     onModuleLoad.emit(state, md);
 }
 
@@ -349,7 +349,8 @@ void RawMonitor::onTranslateInstructionStart(ExecutionSignal *signal,
     for (it = m_cfg.begin(); it != m_cfg.end(); ++it) {
         const Cfg &c = *it;
 		s2e()->getDebugStream() << "[onTIS] RawMonitor:" << c.name << " " << 
-				hexval(c.start) << ' ' << hexval(c.size) << '\n';
+				" Start = " << hexval(c.start) << ", " << " Size = " << hexval(c.size) << '\n';
+
         loadModule(state, c, true);
     }
 
@@ -366,7 +367,7 @@ bool RawMonitor::getImports(S2EExecutionState *s, const ModuleDescriptor &desc, 
 
 bool RawMonitor::getImports(S2EExecutionState *s, const ModuleDescriptor &desc, Imports &I)
 {
-	s2e()->getWarningsStream() << "Program PID:"<<hexval(s->getPid())<<hexval(desc.Pid)<< "\n";      //add by sun for librarycall
+	s2e()->getWarningsStream() << "Program PID:"<< hexval(s->getPid()) << hexval(desc.Pid) << "\n";      //add by sun for librarycall
     if (desc.Pid && s->getPid() != desc.Pid) {
         return false;
     }
@@ -374,17 +375,21 @@ bool RawMonitor::getImports(S2EExecutionState *s, const ModuleDescriptor &desc, 
     //WindowsImage Img(s, desc.LoadBase);
     //I = Img.GetImports(s);
     ImportedFunctions F;
-	
-	F.insert(std::pair<std::string, uint64_t>("read@plt-0x10", 0x080483c0));
-	F.insert(std::pair<std::string, uint64_t>("read@plt", 0x080483d0));
+
+	//original, test the dynamic linked executable,	
+	F.insert(std::pair<std::string, uint64_t>("foo", 0x08048760)); //should be called from 0x8048479 and 8048619
+	F.insert(std::pair<std::string, uint64_t>("read", 0x080483d0));
 	F.insert(std::pair<std::string, uint64_t>("printf", 0x080483e0));
+
+/*	
 	F.insert(std::pair<std::string, uint64_t>("lseek", 0x080483f0));
 	F.insert(std::pair<std::string, uint64_t>("puts", 0x08048400));
 	F.insert(std::pair<std::string, uint64_t>("__gmon_start__", 0x08048410));
+	F.insert(std::pair<std::string, uint64_t>("open", 0x08048420));
 	F.insert(std::pair<std::string, uint64_t>("__libc_start_main", 0x08048430));
 	F.insert(std::pair<std::string, uint64_t>("write", 0x08048440));
 	F.insert(std::pair<std::string, uint64_t>("close", 0x08048450));
-
+*/
 	I.insert(pair<std::string, ImportedFunctions>("GLIBC_2_0", F));
 	Imports::iterator st = I.find("GLIBC_2_0");
 	s2e()->getWarningsStream() << st->first << "\n";      //add by sun for librarycall

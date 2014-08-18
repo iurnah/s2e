@@ -119,9 +119,10 @@ private:
 
 
 void shadowMemoryInit(void);
+#if 0
 static void set_mem_ins_addr(uint32_t addr, uint32_t bytes);
 static uint32_t get_mem_ins_addr(uint32_t addr); 
-
+#endif
 } // namespace plugins
 } // namespace s2e
 

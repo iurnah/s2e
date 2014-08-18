@@ -104,6 +104,7 @@ private:
 public:
     LibraryCallMonitorState();
     virtual ~LibraryCallMonitorState();
+	uint64_t getBp(S2EExecutionState *state);
     virtual LibraryCallMonitorState* clone() const;
     static PluginState *factory(Plugin *p, S2EExecutionState *s);
 

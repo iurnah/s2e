@@ -11,6 +11,7 @@
 #include <s2e/Plugin.h>
 #include <s2e/S2EExecutionState.h>
 #include <s2e/Plugins/CorePlugin.h>
+#include <s2e/Plugins/ModuleExecutionDetector.h>
 
 #include <map>
 #include <vector>
@@ -34,6 +35,11 @@ public:
 	void initialize();
 
 	InterruptSignal& getInterruptSignal(S2EExecutionState* state, int interrupt);
+
+	void onModuleTransition(
+        S2EExecutionState *state,
+        const ModuleDescriptor *prevModule,
+        const ModuleDescriptor *currentModule);
 	void slotTranslateBlockEnd(ExecutionSignal*, S2EExecutionState *state,
 	                               TranslationBlock *tb, uint64_t pc,
 	                               bool, uint64_t);
@@ -45,7 +51,9 @@ public:
 	void onInterrupt(S2EExecutionState*, uint64_t);
 private:
 //	bool m_initialized;
-
+	bool flag_isInterceptedModules;
+	std::set<std::string> m_interceptedModules;
+	ModuleExecutionDetector *m_executionDetector;
 };
 
 class InterruptMonitorState : public PluginState

@@ -111,9 +111,11 @@ protected:
     llvm::raw_ostream*   m_messagesFileRaw;
     llvm::raw_ostream*   m_warningsFileRaw;
 
+    llvm::raw_ostream*   m_memoryTypeFileRaw;
+
     llvm::raw_ostream*   m_messageStream;
     llvm::raw_ostream*   m_warningStream;
-
+    llvm::raw_ostream*   m_memoryTypeStream;
 
     TCGLLVMContext *m_tcgLLVMContext;
 
@@ -199,6 +201,12 @@ public:
     /** Get warnings stream (used for warnings, duplicated on the screen) */
     llvm::raw_ostream& getWarningsStream(const S2EExecutionState* state = 0) const {
         return getStream(*m_warningStream, state);
+    }
+
+	/** Get Memory types stream (used for results output of the data structure
+	 * typing */
+	llvm::raw_ostream& getMemoryTypeStream(const S2EExecutionState* state = 0) const {
+        return getStream(*m_memoryTypeStream, state);
     }
 
     static void printf(llvm::raw_ostream &os, const char *fmt, ...);

@@ -598,7 +598,7 @@ int cpu_exec(CPUArchState *env)
                              (long)tb->tc_ptr, tb->pc,
                              lookup_symbol(tb->pc));
 #endif
-                /* see if we can patch the calling TB. When the TB
+                /* see if we can patch the calling TB(block chainning). When the TB
                    spans two pages, we cannot safely do a direct
                    jump. */
                 if (next_tb != 0 && tb->page_addr[1] == -1) {

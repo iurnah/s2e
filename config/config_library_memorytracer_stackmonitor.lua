@@ -12,15 +12,18 @@ plugins = {
   "RawMonitor",
   "ModuleExecutionDetector",
   "CodeSelector", -- must included, opcode need it to execute
+
+  "ExecutionTracer",
+  "MemoryTracer",
   --"TranslationBlockTracer", --
-  --"ExecutionTracer",
   --"ModuleTracer",
-  --"MemoryAnalyzer",
   --"TestCaseGenerator",
   --"InterruptMonitor",
   --"LinuxSyscallMonitor",
+  --"StackMonitor",
   "X86FunctionMonitor",
   "LibraryCallMonitor",
+
   "HostFiles"
 }
 
@@ -31,9 +34,13 @@ pluginsConfig.RawMonitor = {
 }
 
 pluginsConfig.ModuleExecutionDetector = {
-  open_id = {
-    moduleName = "open",
+  init_env_id = { --have to remove the dot here and to process in the assignement process.
+    moduleName = "init_env.so",
     kernelMode = false,
+  },
+  prog2 = {
+    moduleName = "prog2",
+    kernelMode = false,	
   },
   trackAllModules = true,
   configureAllModules = false  
@@ -44,7 +51,20 @@ pluginsConfig.HostFiles = {
 }
 
 pluginsConfig.CodeSelector = {
-	moduleIds = {"open_id"}
+	moduleIds = { "prog2", "init_env.so" }
+}
+
+pluginsConfig.MemoryTracer = {
+	monitorMemory = true,
+	monitorModules = true,
+}
+
+pluginsConfig.X86FunctionMonitor = {
+
+}
+
+pluginsConfig.LibraryCallMonitor = {
+	moduleIds = { "prog2" }
 }
 
 pluginsConfig.TranslationBlockTracer = {
@@ -57,11 +77,6 @@ pluginsConfig.ExecutionTracer = {
 
 pluginsConfig.ModuleTracer = {
 
-}
-
-pluginsConfig.MemoryAnalyzer = {
-	monitorMemory = true,
-	monitorModules = true,
 }
 
 pluginsConfig.InterruptMonitor = {

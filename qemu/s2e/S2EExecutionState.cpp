@@ -720,6 +720,16 @@ uint64_t S2EExecutionState::getSp() const
     return cast<ConstantExpr>(e)->getZExtValue(64);
 }
 
+uint64_t S2EExecutionState::getBp() const
+{
+#ifdef TARGET_ARM
+    ref<Expr> e = readCpuRegister(CPU_OFFSET(regs[11]), 8 * CPU_REG_SIZE);
+#elif defined(TARGET_I386)
+    ref<Expr> e = readCpuRegister(CPU_OFFSET(regs[R_EBP]), 8 * CPU_REG_SIZE);
+#endif
+    return cast<ConstantExpr>(e)->getZExtValue(64);
+}
+
 //This function must be called just after the machine call instruction
 //was executed.
 bool S2EExecutionState::bypassFunction(unsigned paramCount)

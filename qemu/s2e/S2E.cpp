@@ -322,10 +322,13 @@ S2E::~S2E()
     delete m_warningStream;
     delete m_messageStream;
 
+    delete m_memoryTypeStream;
+
     delete m_infoFileRaw;
     delete m_warningsFileRaw;
     delete m_messagesFileRaw;
     delete m_debugFileRaw;
+	delete m_memoryTypeFileRaw;
 }
 
 Plugin* S2E::getPlugin(const std::string& name) const
@@ -450,6 +453,7 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
     m_debugFileRaw = openOutputFile("debug.txt");
     m_messagesFileRaw = openOutputFile("messages.txt");
     m_warningsFileRaw = openOutputFile("warnings.txt");
+    m_memoryTypeFileRaw = openOutputFile("memory.txt");
 
     // Messages appear in messages.txt, debug.txt and on stdout
     raw_tee_ostream *messageStream = new raw_tee_ostream(m_messagesFileRaw);
@@ -467,7 +471,10 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
     warningsStream->addParentBuf(new raw_highlight_ostream(&llvm::errs()));
     m_warningStream = warningsStream;
 
+//for the memory data structure typing output file
+    raw_tee_ostream *memoryTypeStream = new raw_tee_ostream(m_memoryTypeFileRaw);
 
+	m_memoryTypeStream = memoryTypeStream;
 #if 0
     // Messages appear in messages.txt, debug.txt and on stdout
     m_messagesStreamBuf = new TeeStreamBuf(messagesFileBuf);

@@ -48,11 +48,38 @@ extern "C" {
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(X86FunctionMonitor, "Function calls/returns monitoring plugin", "",);
+S2E_DEFINE_PLUGIN(X86FunctionMonitor, "Function calls/returns monitoring plugin", "X86FunctionMonitor", "ModuleExecutionDetector");
 
 void X86FunctionMonitor::initialize()
 {
     m_monitor = static_cast<OSMonitor*>(s2e()->getPlugin("Interceptor"));
+
+	m_executionDetector = (ModuleExecutionDetector*)s2e()->getPlugin("ModuleExecutionDetector");
+    assert(m_executionDetector);
+	
+    //Fetch the list of modules where forking should be enabled
+    ConfigFile *cfg = s2e()->getConfig();
+	bool ok = false;
+    ConfigFile::string_list moduleList =
+            cfg->getStringList(getConfigKey() + ".moduleIds", ConfigFile::string_list(), &ok);
+
+    if (!ok || moduleList.empty()) {
+        s2e()->getWarningsStream() << "You should specify a list of modules in " <<
+                getConfigKey() + ".moduleIds\n";
+    }
+
+    foreach2(it, moduleList.begin(), moduleList.end()) {
+        if (m_executionDetector->isModuleConfigured(*it)) {
+            m_interceptedModules.insert(*it);
+			s2e()->getWarningsStream() << "X86FunctionMonitor: Module " << *it << " is inserted m_interceptedModules!\n";
+        }else {
+            s2e()->getWarningsStream() << "X86FunctionMonitor: " << "Module " << *it << " is not configured\n";
+            exit(-1);
+        }
+    }
+
+    m_executionDetector->onModuleTransition.connect(
+        sigc::mem_fun(*this, &X86FunctionMonitor::onModuleTransition));
 
     s2e()->getCorePlugin()->onTranslateBlockEnd.connect(
             sigc::mem_fun(*this, &X86FunctionMonitor::slotTranslateBlockEnd));
@@ -87,10 +114,16 @@ void X86FunctionMonitor::slotTranslateBlockEnd(ExecutionSignal *signal,
 {
 	//s2e()->getDebugStream() << "X86FunctionMonitor: slotTranslateBlockEnd!!!" << '\n';
 	/* We intercept all call and ret translation blocks */
-    if (tb->s2e_tb_type == TB_CALL || tb->s2e_tb_type == TB_CALL_IND) {
+    if (tb->s2e_tb_type == TB_CALL || tb->s2e_tb_type == TB_CALL_IND){
         signal->connect(sigc::mem_fun(*this,
                             &X86FunctionMonitor::slotCall));
-	//s2e()->getDebugStream() << "X86FunctionMonitor: slotCall Connected!!!" << '\n';
+		uint32_t ebp;
+		uint32_t esp;
+		state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EBP]), &(ebp), sizeof(uint32_t));
+		state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_ESP]), &(esp), sizeof(uint32_t));
+		//TODO:here we get the diferent EBP value.
+
+		//s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor: slotCall Connected!!! PC = " << hexval(pc) << '\n';
     }
 }
 
@@ -105,10 +138,61 @@ void X86FunctionMonitor::slotTranslateJumpStart(ExecutionSignal *signal,
     }
 }
 
+void X86FunctionMonitor::onModuleTransition(
+        S2EExecutionState *state,
+        const ModuleDescriptor *prevModule,
+        const ModuleDescriptor *currentModule)
+{
+    if (!currentModule) {
+        //state->disableForking();
+		flag_isInterceptedModules = false;
+		s2e()->getMemoryTypeStream(state) << "set the flag to false when the current module if NULL" << '\n';
+        return;
+    }
+	
+	if(prevModule == NULL){
+		s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor::onModuleTransition: prevModule=NULL" << '\n';
+	}else 
+		s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor::onModuleTransition: prevModule=" << 
+			prevModule->Name << " currentModule=" << currentModule->Name << '\n';
+
+    const std::string *id = m_executionDetector->getModuleId(*currentModule);
+    if (m_interceptedModules.find(*id) == m_interceptedModules.end()) {
+        //state->disableForking(); //in s2e-out-38, this never reached.
+		flag_isInterceptedModules = false;
+		s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor::set the flag to false because of enter not intercept module" << '\n';
+        return;
+    }
+
+	s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor::set the flag to true because of enter the moduleId = " << *id << '\n';
+	flag_isInterceptedModules = true; //TODO: is there a fourth possible of transition? 
+}
+
 void X86FunctionMonitor::slotCall(S2EExecutionState *state, uint64_t pc)
 {
-    DECLARE_PLUGINSTATE(X86FunctionMonitorState, state);
+	//TODO: here we check the module is the one we configured.
+	if(!flag_isInterceptedModules){
+		return;
+	}	
+	
+	uint32_t ebp;
+   	uint32_t esp;
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBP]), &(ebp), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESP]), &(esp), sizeof (uint32_t) );
 
+	//FIXME:Here I can read the different ESP and EBP values.
+	s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor: slotCall EBP = " << hexval(ebp) << '\n';
+	s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor: slotCall ESP = " << hexval(esp) << '\n';
+	s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor: slotCall PC  = " << hexval(pc) << '\n';
+    DECLARE_PLUGINSTATE(X86FunctionMonitorState, state);
+#if 0
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBP]), &(ebp), sizeof (uint32_t) );
+	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESP]), &(esp), sizeof (uint32_t) );
+
+	//FIXME:Here I can read the different ESP and EBP values.
+	s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor: slotCall EBP = " << hexval(ebp) << " getBp = " << hexval(state->getBp()) << '\n';
+	s2e()->getMemoryTypeStream(state) << "X86FunctionMonitor: slotCall ESP = " << hexval(esp) << " getSp = " << hexval(state->getSp()) << '\n';
+#endif
     return plgState->slotCall(state, pc);
 }
 
@@ -194,29 +278,46 @@ X86FunctionMonitor::CallSignal* X86FunctionMonitorState::getCallSignal(
     std::pair<CallDescriptorsMap::iterator, CallDescriptorsMap::iterator>
             range = m_callDescriptors.equal_range(eip);
 
-    for(CallDescriptorsMap::iterator it = range.first; it != range.second; ++it) {
-        if(it->second.cr3 == cr3)
-            return &it->second.signal;
-    }
+	CallDescriptorsMap::iterator it_new;
+	if(range.first == range.second){//the signal doesn't exist, create one and insert to m_newCallDescriptors
+		//m_plugin->s2e()->getMemoryTypeStream() << "X86FunctionMonitorState::getCallSignal return Nothing" << '\n';
 
+	    CallDescriptor descriptor = { cr3, X86FunctionMonitor::CallSignal() };
+		it_new = m_newCallDescriptors.insert(std::make_pair(eip, descriptor));
+	}else { //if have it in the m_callDescriptors map, try to look for the callSignal, if not exist should XXX also XXX create one
+		for(CallDescriptorsMap::iterator it = range.first; it != range.second; ++it) {
+			if(it->second.cr3 == cr3){ //find the signal for the eip and cr3
+				return &it->second.signal;
+			}else { //in this case, although the key(eip) exist in m_callDescriptors, but no mach cr3, have to create. same pc different process
+				CallDescriptor descriptor = { cr3, X86FunctionMonitor::CallSignal() };
+				it_new = m_newCallDescriptors.insert(std::make_pair(eip, descriptor));
+			}
+		}
+	}
 
-    CallDescriptor descriptor = { cr3, X86FunctionMonitor::CallSignal() };
-    CallDescriptorsMap::iterator it =
-            m_newCallDescriptors.insert(std::make_pair(eip, descriptor));
+	return &it_new->second.signal; 
 
-    return &it->second.signal;
 }
 
+/* slotCall first need to check the pc in this call is the correct one, this pc
+ * should from the signal parameter, if this pc(not eip) is not in the
+ * m_callDescriptors map, it should just ignore */
 void X86FunctionMonitorState::slotCall(S2EExecutionState *state, uint64_t pc)
 {
     target_ulong cr3 = state->getPid();
     target_ulong eip = state->getPc();
-	//m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: slotCall triggered!!!" << '\n';
+	//uint64_t ebp = state->getBp();
+	//uint64_t esp = state->getSp();
+	//TODO:debug to check whether pc and eip value, to see whether they are able
+	//to match to the imported function
+	m_plugin->s2e()->getMemoryTypeStream(state) << "X86FunctionMonitorState::slotCall PC =" << hexval(pc) << '\n';
+	m_plugin->s2e()->getMemoryTypeStream(state) << "X86FunctionMonitorState::slotCall eip=" << hexval(eip) << '\n';
+	/* add the cached CallDescriptors to the m_callDescriptors map */	
     if (!m_newCallDescriptors.empty()) {
         m_callDescriptors.insert(m_newCallDescriptors.begin(), m_newCallDescriptors.end());
         m_newCallDescriptors.clear();
     }
-
+#if 0
     /* Issue signals attached to all calls (eip==-1 means catch-all) */
     if (!m_callDescriptors.empty()) {
         std::pair<CallDescriptorsMap::iterator, CallDescriptorsMap::iterator>
@@ -228,7 +329,8 @@ void X86FunctionMonitorState::slotCall(S2EExecutionState *state, uint64_t pc)
             }
             if(it->second.cr3 == (uint64_t)-1 || it->second.cr3 == cr3) {
                 cd.signal.emit(state, this);
-				//m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: cd.signal.emitted!!!" << '\n';
+			
+				m_plugin->s2e()->getMemoryTypeStream(state) << "X86FunctionMonitorState: cd.signal.emitted!!!" << '\n';
             }
         }
         if (!m_newCallDescriptors.empty()) {
@@ -236,23 +338,56 @@ void X86FunctionMonitorState::slotCall(S2EExecutionState *state, uint64_t pc)
             m_newCallDescriptors.clear();
         }
     }
+#endif
 
     /* Issue signals attached to specific calls */
     if (!m_callDescriptors.empty()) {
         std::pair<CallDescriptorsMap::iterator, CallDescriptorsMap::iterator>
-                range;
+                range = m_callDescriptors.equal_range(eip);
+		/* FIXME: Problem might be here, eip is the pointer point to the call
+		 * function, while the pc in the m_callDescriptors is only have the pc
+		 * value to the function, we should distinguish those pc values. 
+		 * 1. when the pc is the last instruction of the translation block, such as 8048508: call 80483d0 <read@plt>
+		 * 2. when the pc is pointing to the instruction of the begining of the function, such as 80483d0 <read@plt> 
+		 * 3. what is the pc passed by the ExecutionSignal, "pc of the instruction being translated", this pc is point to the last instruction in the tb.
+		 * */
+		 
 
-        range = m_callDescriptors.equal_range(eip);
+/* this isn't necessary, since if the first == second, the for loop will not run once at all 
+		if(range.first == range.second){
+			m_plugin->s2e()->getMemoryTypeStream(state) << "X86FunctionMonitorState::slotCall equal_range didn't return any match !!!" << '\n';
+		}else {
+			m_plugin->s2e()->getMemoryTypeStream(state) << "X86FunctionMonitorState::slotCall equal_range(" << hexval(eip) << ") returned!!!" << '\n';
+		}
+*/
+		//might cased by this for loop.
         for(CallDescriptorsMap::iterator it = range.first; it != range.second; ++it) {
             CallDescriptor cd = (*it).second;
             if (m_plugin->m_monitor) {
-                cr3 = m_plugin->m_monitor->getPid(state, pc);
+                cr3 = m_plugin->m_monitor->getPid(state, pc); // retrive cr3 to emit the correspondent signal
             }
-            if(it->second.cr3 == (uint64_t)-1 || it->second.cr3 == cr3) {
+			
+			//Rui: this pc value passed from signal is correct, but the stack
+			//pointer and the base pointer is not correct, TODO:because the it
+			//is a state issue?
+            if(it->second.cr3 == (uint64_t)-1 || it->second.cr3 == cr3) {//so far, we never create with cr3 = -1
+
                 cd.signal.emit(state, this);
-				//m_plugin->s2e()->getDebugStream() << "X86FunctionMonitorState: cd.signal.emitted too!!!" << '\n';
+	
+				/*TODO: here EBP always same 
+				uint32_t ebp, esp;
+				state->readCpuRegisterConcrete(CPU_OFFSET (regs[R_EBP]), &(ebp), sizeof (uint32_t) );
+				state->readCpuRegisterConcrete(CPU_OFFSET (regs[R_ESP]), &(esp), sizeof (uint32_t) );
+				m_plugin->s2e()->getMemoryTypeStream(state) << "X86FunctionMonitorState::slotCall EBP = " << hexval(ebp) << '\n';
+				m_plugin->s2e()->getMemoryTypeStream(state) << "X86FunctionMonitorState::slotCall ESP = " << hexval(esp) << '\n';
+				//TODO: debug print to see whether the emit is trigged by find
+				//the signal in the populated m_callDescriptors data structure
+				m_plugin->s2e()->getMemoryTypeStream(state) << "X86FunctionMonitorState: cd.signal.emitted when eip="
+						<< hexval(eip) << " and cr3=" << hexval(cr3) << '\n';
+				*/
             }
         }
+
         if (!m_newCallDescriptors.empty()) {
             m_callDescriptors.insert(m_newCallDescriptors.begin(), m_newCallDescriptors.end());
             m_newCallDescriptors.clear();

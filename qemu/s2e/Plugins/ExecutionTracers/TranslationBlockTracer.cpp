@@ -70,6 +70,7 @@ struct X86State {
 
 const char *RegSymbol[] = { "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI" };
 
+#if 0
 /* shadow memory parameters */
 #define PAGE_SIZE 65536 //2^16
 #define PAGE_NUM 262144 //2^18
@@ -128,6 +129,7 @@ static void set_mem_ins_addr(uint32_t addr, uint32_t bytes)
 	//cout << sm_off << endl;
 	(sm->page)[sm_off] = bytes;
 }
+#endif
 
 void TranslationBlockTracer::initialize()
 {
@@ -163,10 +165,6 @@ void TranslationBlockTracer::enableTracing()
 
     m_tbEndConnection = m_detector->onModuleTranslateBlockEnd.connect(
             sigc::mem_fun(*this, &TranslationBlockTracer::onModuleTranslateBlockEnd));
-#if 0
-	m_onLoadStroeConnection = s2e()->getCorePlugin()->onLoadStoreInstruction.connect(
-			sigc::mem_fun(*this, &TranslationBlockTracer::onLoadStoreInstruction));
-#endif
 }
 
 void TranslationBlockTracer::disableTracing()
@@ -177,8 +175,8 @@ void TranslationBlockTracer::disableTracing()
 
     m_tbStartConnection.disconnect();
     m_tbEndConnection.disconnect();
-	//m_onLoadStoreConnection.disconnect();
 }
+
 #if 0
 /* member function to receive the source and destination operator */
 void TranslationBlockTracer::onGen_LoadStore(ExecutionSignal *signal,
@@ -254,7 +252,6 @@ void TranslationBlockTracer::trace(S2EExecutionState *state, uint64_t pc, ExecTr
 
 }
 
-#if 0
 void TranslationBlockTracer::onExecuteBlockStart(S2EExecutionState *state, uint64_t pc)
 {
     trace(state, pc, TRACE_TB_START);
@@ -264,8 +261,8 @@ void TranslationBlockTracer::onExecuteBlockEnd(S2EExecutionState *state, uint64_
 {
     trace(state, pc, TRACE_TB_END);
 }
-#endif
 
+#if 0
 void TranslationBlockTracer::onExecuteBlockStart(S2EExecutionState *state, uint64_t pc)
 {
     trace(state, pc, TRACE_TB_START);
@@ -308,14 +305,21 @@ void TranslationBlockTracer::onLoadStoreInstruction(ExecutionSignal *signal,
 	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBP]), &(s.ebp), sizeof (uint32_t) );
 	state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESP]), &(s.esp), sizeof (uint32_t) );
 
-	s2e()->getDebugStream(state) << "[per insn]PC = " << hexval(pc) << "EAX = " << hexval(s.eax) << " EBX = " << hexval(s.ebx) << " ECX = " << hexval(s.ecx) << " EDX = " << hexval(s.edx) << " ESI = " << hexval(s.esi) << " EDI = " << hexval(s.edi) << " EBP = " << hexval(s.ebp) << " ESP = " << hexval(s.esp) << '\n';
+	s2e()->getDebugStream(state) << "[per insn]PC = " << hexval(pc) 
+			<< " EAX = " << hexval(s.eax) << " EBX = " << hexval(s.ebx) 
+			<< " ECX = " << hexval(s.ecx) << " EDX = " << hexval(s.edx) 
+			<< " ESI = " << hexval(s.esi) << " EDI = " << hexval(s.edi) 
+			<< " EBP = " << hexval(s.ebp) << " ESP = " << hexval(s.esp) << '\n';
 
 	s2e()->getDebugStream() << "Data Propagation: " << RegSymbol[src] << " --> " << RegSymbol[dest] << '\n';
 	//TODO: Insert the analysis code and the shadow memory code here	
+	
+#if 0
 	set_mem_ins_addr(s.esp, -1);	
 	set_mem_ins_addr(s.ebp, -1);
 
 	s2e()->getDebugStream(state) << "SHADOW MEMORY: " << get_mem_ins_addr(s.esp) << '\n';
+#endif
 }
 
 void TranslationBlockTracer::onExecuteBlockEnd(S2EExecutionState *state, uint64_t pc)
@@ -326,6 +330,7 @@ void TranslationBlockTracer::onExecuteBlockEnd(S2EExecutionState *state, uint64_
 
     trace(state, pc, TRACE_TB_END);
 }
+#endif
 
 void TranslationBlockTracer::onCustomInstruction(S2EExecutionState* state, uint64_t opcode)
 {

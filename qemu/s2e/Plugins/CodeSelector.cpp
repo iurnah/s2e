@@ -94,15 +94,15 @@ void CodeSelector::initialize()
     foreach2(it, moduleList.begin(), moduleList.end()) {
         if (m_executionDetector->isModuleConfigured(*it)) {
             m_interceptedModules.insert(*it);
-			s2e()->getWarningsStream() << "CodeSelector: Module " << *it << " is inserted!\n";
+			s2e()->getWarningsStream() << "(conf)CodeSelector: Module " << *it << " is inserted m_interceptedModules!\n";
         }else {
-            s2e()->getWarningsStream() << "CodeSelector: " <<
+            s2e()->getWarningsStream() << "(conf)CodeSelector: " <<
                     "Module " << *it << " is not configured\n";
             exit(-1);
         }
     }
 
-    //Attach the signals
+    //Attach the signals from the ModuleExecutionDetector plugin
     m_executionDetector->onModuleTransition.connect(
         sigc::mem_fun(*this, &CodeSelector::onModuleTransition));
 
@@ -118,12 +118,20 @@ void CodeSelector::onModuleTransition(
 {
     if (!currentModule) {
         state->disableForking();
+		s2e()->getDebugStream(state) << "CodeSelector::disableForking because of currentModule passed NULL" << '\n';
         return;
     }
+	
+	if(prevModule == NULL){
+		s2e()->getDebugStream(state) << "CodeSelector::onModuleTransition: prevModule=NULL" << '\n';
+	}else 
+		s2e()->getDebugStream(state) << "CodeSelector::onModuleTransition: prevModule=" << 
+			prevModule->Name << " currentModule=" << currentModule->Name << '\n';
 
     const std::string *id = m_executionDetector->getModuleId(*currentModule);
     if (m_interceptedModules.find(*id) == m_interceptedModules.end()) {
-        state->disableForking();
+        state->disableForking(); //in s2e-out-38, this never reached.
+		s2e()->getDebugStream(state) << "CodeSelector::disableForking because of enter not intercept module" << '\n';
         return;
     }
 
@@ -176,15 +184,22 @@ void CodeSelector::onPrivilegeChange(
     //Check now if we are in user-mode.
     if ((*it).second == false) {
         //XXX: Remove hard-coded CPL level. It is x86-architecture-specific.
-        if (current == 3) {
+        if (current == 3) { //cpl = 3 indicate user mode
             //Enable forking in user mode.
-            state->enableForking();
+            state->enableForking(); //start Forking in libs
         } else {
             state->disableForking();
         }
-    }
+#if 1 //add this else case to make the --select-process enable all fork in the process
+	  //including kernel code
+    }else if((*it).second == true){
+		state->enableForking();
+#endif
+	}
 }
 
+//when we use the select-process-code, we don't use opcode AE 00 and AE 01 for
+//code selector. We only use the AE 02 for opSelectModule
 void CodeSelector::opSelectProcess(S2EExecutionState *state)
 {
     bool ok = true;
@@ -201,19 +216,21 @@ void CodeSelector::opSelectProcess(S2EExecutionState *state)
             m_privilegeTracking = s2e()->getCorePlugin()->onPrivilegeChange.connect(
                     sigc::mem_fun(*this, &CodeSelector::onPrivilegeChange));
         }
-    } else { //this eles might be not usable by Rui
+    } else { //~~this eles might be not usable by Rui~~
         m_pidsToTrack[state->getPid()] = true;
 
-		/* might be a bug here ???!!!
         if (!m_privilegeTracking.connected()) {
             m_privilegeTracking = s2e()->getCorePlugin()->onPageDirectoryChange.connect(
                     sigc::mem_fun(*this, &CodeSelector::onPageDirectoryChange));
-        } */
-		//corrected code
+        } 
+		/* misunderstand the code, thought it is a bug, infact, not, so comment
+		 * out this section, */
+		/*
         if (!m_addressSpaceTracking.connected()) {
             m_addressSpaceTracking = s2e()->getCorePlugin()->onPageDirectoryChange.connect(
                     sigc::mem_fun(*this, &CodeSelector::onPageDirectoryChange));
         }
+		*/
 
     }
 }
@@ -227,7 +244,7 @@ void CodeSelector::opUnselectProcess(S2EExecutionState *state)
 
     if(!ok) {
         s2e()->getWarningsStream(state)
-            << "CodeSelector: Could not read the pid value of the process to disable.\n";
+            << "[opCode]CodeSelector: Could not read the pid value of the process to disable.\n";
         return;
     }
 
@@ -252,28 +269,35 @@ bool CodeSelector::opSelectModule(S2EExecutionState *state)
 
     if(!ok) {
         s2e()->getWarningsStream(state)
-            << "CodeSelector: Could not read the module id pointer.\n";
+            << "[opCode]CodeSelector: Could not read the module id pointer.\n";
         return false;
     }
 
     std::string strModuleId;
     if (!state->readString(moduleId, strModuleId)) {
         s2e()->getWarningsStream(state)
-            << "CodeSelector: Could not read the module id string.\n";
+            << "[opCode]CodeSelector: Could not read the module id string.\n";
         return false;
     }
 
+	//TODO why check configuration in ModuleExecutionDetector? modify?
     if (m_executionDetector->isModuleConfigured(strModuleId)) {
-        m_interceptedModules.insert(strModuleId);
-		s2e()->getWarningsStream() << "CodeSelector: " <<
+        if(m_interceptedModules.find(strModuleId) == m_interceptedModules.end()){
+			m_interceptedModules.insert(strModuleId);
+
+			s2e()->getWarningsStream() << "[opCode]CodeSelector: " <<
                 "Module " << strModuleId << " is insert to m_interceptedModules\n";
+		}else 
+			s2e()->getWarningsStream() << "[opCode]CodeSelector: " << 
+				strModuleId << " is inserted to m_interceptedModules already\n" ;
     }else {
-        s2e()->getWarningsStream() << "CodeSelector: " <<
-                "Module " << strModuleId << " is not configured\n";
+        s2e()->getWarningsStream() << "[opCode]CodeSelector: " <<
+                "Module " << strModuleId << " is not configured in ModuleExecutionDetector\n";
         return false;
     }
 
-    s2e()->getMessagesStream() << "CodeSelector: tracking module " << strModuleId << '\n';
+    s2e()->getMessagesStream() << "[opCode]CodeSelector: tracking module " << 
+			strModuleId << '\n';
 
     return true;
 }
@@ -290,7 +314,7 @@ void CodeSelector::onCustomInstruction(
     uint64_t subfunction = OPCODE_GETSUBFUNCTION(operand);
 
     switch(subfunction) {
-        //Track the currently-running process (either whole system or user-space only)
+        //Track the currently-running process (either whole passed system or user-space only)
         case 0: {
             opSelectProcess(state);
         }
@@ -307,6 +331,7 @@ void CodeSelector::onCustomInstruction(
 
         //Adds the module id specified in ecx to the list
         //of modules where to enable forking.
+		//this correspond to the --select-process-code option
         case 2: {
             if (opSelectModule(state)) {
                 tb_flush(env);
@@ -317,7 +342,6 @@ void CodeSelector::onCustomInstruction(
         break;
     }
 }
-
 
 #if 0
 

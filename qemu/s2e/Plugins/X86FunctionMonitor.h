@@ -40,6 +40,7 @@
 #include <s2e/Plugins/CorePlugin.h>
 #include <s2e/S2EExecutionState.h>
 #include <s2e/Plugins/OSMonitor.h>
+#include <s2e/Plugins/ModuleExecutionDetector.h>
 
 #include <tr1/unordered_map>
 
@@ -77,6 +78,10 @@ protected:
                                 TranslationBlock*,
                                 uint64_t, int jump_type);
 
+	void onModuleTransition(S2EExecutionState *state,
+						const ModuleDescriptor *prevModule,
+						const ModuleDescriptor *currentModule);
+
     void slotCall(S2EExecutionState* state, uint64_t pc);
     void slotRet(S2EExecutionState* state, uint64_t pc);
 
@@ -85,6 +90,10 @@ protected:
 
 protected:
     OSMonitor *m_monitor;
+
+	bool flag_isInterceptedModules;
+	std::set<std::string> m_interceptedModules;
+	ModuleExecutionDetector *m_executionDetector;
 
     friend class X86FunctionMonitorState;
 

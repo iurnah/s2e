@@ -236,6 +236,7 @@ static void __s2e_init_env(int *argcPtr, char ***argvPtr)
     #ifndef DEBUG_NATIVE
     s2e_codeselector_select_module("init_env.so");
 	//	Try to disable this codeselector ".
+	//	removed in guest.
     #endif
     // Recognize --help when it is the sole argument.
     if (argc == 2 && __streq(argv[1], "--help")) {
@@ -255,6 +256,7 @@ static void __s2e_init_env(int *argcPtr, char ***argvPtr)
     #ifndef DEBUG_NATIVE
     s2e_enable_forking();
     #endif
+	myprintf("inti_env.c: s2e_enable_forking() is called\n");
 
     while (k < argc) {
         if (__streq(argv[k], "--concolic") || __streq(argv[k], "-concolic")) {
@@ -333,7 +335,7 @@ static void __s2e_init_env(int *argcPtr, char ***argvPtr)
 // ****************************
 
 // The type of __libc_start_main
-typedef int (*T_libc_start_main)(
+typedef int (*T_libc_start_main)(//function pointer defined
         int *(main) (int, char**, char**),
         int argc,
         char ** ubp_av,
@@ -343,7 +345,7 @@ typedef int (*T_libc_start_main)(
         void (*stack_end)
         );
 
-int __libc_start_main(
+int __libc_start_main(//function declarition 
         int *(main) (int, char **, char **),
         int argc,
         char ** ubp_av,
@@ -353,7 +355,7 @@ int __libc_start_main(
         void *stack_end)
         __attribute__ ((noreturn));
 
-int __libc_start_main(
+int __libc_start_main(//function definition
         int *(main) (int, char **, char **),
         int argc,
         char ** ubp_av,
@@ -365,6 +367,9 @@ int __libc_start_main(
     __s2e_init_env(&argc, &ubp_av);
 
     T_libc_start_main orig_libc_start_main = (T_libc_start_main)dlsym(RTLD_NEXT, "__libc_start_main");
+
+	myprintf("inti_env.c: the real main is called\n");
+
     (*orig_libc_start_main)(main, argc, ubp_av, init, fini, rtld_fini, stack_end);
 
     exit(1); // This is never reached

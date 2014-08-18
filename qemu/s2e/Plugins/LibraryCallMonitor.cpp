@@ -37,8 +37,8 @@ extern "C" {
 #include <qemu-common.h>
 #include <cpu-all.h>
 #include <exec-all.h>
+extern CPUArchState *env;
 }
-
 
 #include <s2e/S2E.h>
 #include <s2e/ConfigFile.h>
@@ -94,7 +94,7 @@ void LibraryCallMonitor::initialize()
 	s2e()->getDebugStream() << "LibraryCallMonitor: Plugin initialized!!!" << '\n';
 }
 
-
+/* this onModuleLoad is from ModuleExecutionDetector */
 void LibraryCallMonitor::onModuleLoad(
         S2EExecutionState* state,
         const ModuleDescriptor &module
@@ -118,25 +118,83 @@ void LibraryCallMonitor::onModuleLoad(
     DECLARE_PLUGINSTATE(LibraryCallMonitorState, state);
 
     foreach2(it, imports.begin(), imports.end()) {
-        const std::string &libName = (*it).first;
-        const ImportedFunctions &funcs = (*it).second;
-        foreach2(fit, funcs.begin(), funcs.end()) {
+        const std::string &libName = (*it).first;	/* retrive the lib name */
+        const ImportedFunctions &funcs = (*it).second; /* retrive the function symbols  and the PC */
+        foreach2(fit, funcs.begin(), funcs.end()) { /* to process the function symbols */
             const std::string &funcName = (*fit).first;
             std::string composedName = libName + "!";
             composedName = composedName + funcName;
 
             uint64_t address = (*fit).second;
 
-            std::pair<StringSet::iterator, bool> insertRes;
-            insertRes = m_functionNames.insert(composedName);
+            std::pair<StringSet::iterator, bool> insertRes; /* TODO: what this for */
+            insertRes = m_functionNames.insert(composedName); /* the m_functionNames(unordered_set) has GLIBC_2_0!puts */
 
             const char *cstring = (*insertRes.first).c_str();
-            plgState->m_functions[address] = cstring;
-
+            plgState->m_functions[address] = cstring; /* Insert to the per state data structure (unordered_map AddressToFunctionName) */	
+			//s2e()->getDebugStream() <<  "LibraryCallMonitor: address=" << address << "cstring= " << cstring << '\n';	
+			
+			s2e()->getMemoryTypeStream(state) << "In the Inner foreach2 loop!!! Before getCallSignal." << '\n';
             X86FunctionMonitor::CallSignal *cs = m_functionMonitor->getCallSignal(state, address, module.Pid);
+			//it create a signal (first time) or look for a callSignal that
+			//match the pc and eip in the m_callDescriptors from X86FunctionMonitor.
+			//and connect the returned signal to the slot function onFunctionCall
             cs->connect(sigc::mem_fun(*this, &LibraryCallMonitor::onFunctionCall));
+			s2e()->getMemoryTypeStream(state) << "In the Inner foreach2 loop!!! After the connection." << '\n';
 
 			//s2e()->getDebugStream() << "LibraryCallMonitor: onFunctionCall is connected!!!" << '\n';
+        }
+    }
+}
+
+void LibraryCallMonitor::onFunctionCall(S2EExecutionState* state, X86FunctionMonitorState *fns)
+{
+
+	s2e()->getMemoryTypeStream(state) << "LibraryCallMonitor::onFunctionCall!!!" << '\n';
+    //Only track configured modules
+    uint64_t caller = state->getTb()->pcOfLastInstr;
+    const ModuleDescriptor *mod = m_detector->getModule(state, caller);
+    if (!mod) {
+        return;
+    }
+
+    DECLARE_PLUGINSTATE(LibraryCallMonitorState, state);
+    uint64_t pc = state->getPc();
+/*
+	bool ok = state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_EBP]),&ebp, sizeof(ebp));
+	if(!ok){
+		s2e()->getDebugStream() << "Read Base Pointer failed !!" << '\n';
+	}
+*/
+
+    if (m_displayOnce && (m_alreadyCalledFunctions.find(std::make_pair(mod->Pid, pc)) != m_alreadyCalledFunctions.end())) {
+        return;
+    }
+
+    LibraryCallMonitorState::AddressToFunctionName::iterator it = plgState->m_functions.find(pc);
+    if (it != plgState->m_functions.end()) {
+        const char *str = (*it).second;
+        s2e()->getMemoryTypeStream(state) << mod->Name << "@" << hexval(mod->ToNativeBase(caller)) << " called function " << str << '\n';
+		
+		//TODO: query the function definition to obtain the parameter number and
+		//read the stack for retrive the parameters. We can modify the imports
+		//in RawMonitor to include the name of function and number of parameters
+		//and parameter types.		
+
+		uint64_t esp = state->getSp();
+		uint64_t ebp = plgState->getBp(state);//readCpuRegister(CPU_OFFSET(regs[R_EBP]), 8 * CPU_REG_SIZE)a;
+		//uint64_t ebp1 = state->getBp();
+		//uint64_t ebp3;
+		//bool	ok = state->readRegisterConcrete(env, CPU_OFFSET(regs[R_EBX]), &ebp3, sizeof(ebp3));
+		s2e()->getMemoryTypeStream() << "~onFunctionCall::Base  Pointer =" << hexval(ebp) << '\n';
+		s2e()->getMemoryTypeStream() << "~onFunctionCall::Stack Pointer =" << hexval(esp) << '\n';
+		s2e()->getMemoryTypeStream() << "~onFunctionCall::Prog  Counter =" << hexval(pc) << '\n';
+		s2e()->getMemoryTypeStream() << "------------------END-----------------" << '\n';
+
+        onLibraryCall.emit(state, fns, *mod);
+
+        if (m_displayOnce) {
+            m_alreadyCalledFunctions.insert(std::make_pair(mod->Pid, pc));
         }
     }
 }
@@ -150,36 +208,6 @@ void LibraryCallMonitor::onModuleUnload(
     return;
 }
 
-void LibraryCallMonitor::onFunctionCall(S2EExecutionState* state, X86FunctionMonitorState *fns)
-{
-    //Only track configured modules
-    uint64_t caller = state->getTb()->pcOfLastInstr;
-    const ModuleDescriptor *mod = m_detector->getModule(state, caller);
-    if (!mod) {
-        return;
-    }
-
-    DECLARE_PLUGINSTATE(LibraryCallMonitorState, state);
-    uint64_t pc = state->getPc();
-
-    if (m_displayOnce && (m_alreadyCalledFunctions.find(std::make_pair(mod->Pid, pc)) != m_alreadyCalledFunctions.end())) {
-        return;
-    }
-
-    LibraryCallMonitorState::AddressToFunctionName::iterator it = plgState->m_functions.find(pc);
-    if (it != plgState->m_functions.end()) {
-        const char *str = (*it).second;
-        s2e()->getMessagesStream() << mod->Name << "@" << hexval(mod->ToNativeBase(caller)) << " called function " << str << '\n';
-
-        onLibraryCall.emit(state, fns, *mod);
-
-        if (m_displayOnce) {
-            m_alreadyCalledFunctions.insert(std::make_pair(mod->Pid, pc));
-        }
-    }
-}
-
-
 LibraryCallMonitorState::LibraryCallMonitorState()
 {
 
@@ -190,6 +218,11 @@ LibraryCallMonitorState::~LibraryCallMonitorState()
 
 }
 
+uint64_t LibraryCallMonitorState::getBp(S2EExecutionState *state){
+	
+	return state->getBp();
+
+}
 LibraryCallMonitorState* LibraryCallMonitorState::clone() const
 {
     return new LibraryCallMonitorState(*this);

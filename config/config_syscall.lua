@@ -14,8 +14,8 @@ plugins = {
   "CodeSelector", -- must included, opcode need it to execute
   --"TranslationBlockTracer", --
   --"ExecutionTracer",
-  --"ModuleTracer",
-  --"MemoryAnalyzer",
+  --"ModuleTracer", -- offline maping PC to module.
+  --"MemoryAnalyzer", -- Trace memory access when executing
   --"TestCaseGenerator",
   "InterruptMonitor",
   "LinuxSyscallMonitor",

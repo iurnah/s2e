@@ -185,7 +185,50 @@ void MemoryTracer::traceDataMemoryAccess(S2EExecutionState *state,
     }
 
     m_tracer->writeData(state, &e, sizeof(e), TRACE_MEMORY);
+
+	overWrittenAddressesCollection(state, e.address, e.flags);
+
+#if 0 //naive method implementation
+	std::multimap<uint32_t, uint64_t> overWrittenAddressesId;
+	if(e.flags & EXECTRACE_MEM_WRITE){
+		overWrittenAddressesId.insert(std::pair<uint32_t, uint64_t>(state->getID(), e.address));
+		s2e()->getWarningsStream(state) << "StateID: [ " << state->getID() << " ] " << 
+			  "Over Written Addresses: " << hexval(e.address) << '\n';	
+	}
+#endif
+
 }
+
+#if 1
+/* TODO: have to set the memory dump eip by annotation plugin*/
+void MemoryTracer::overWrittenAddressesCollection(S2EExecutionState *state, 
+													uint64_t address, uint8_t flags)
+{
+	if(flags & EXECTRACE_MEM_WRITE){
+		m_overWrittenAddressesId.insert(std::pair<uint32_t, uint64_t>(state->getID(), address));
+		s2e()->getWarningsStream(state) << "StateID: [ " << state->getID() << " ] " << 
+			  "Over Written Addresses: " << hexval(address) << '\n';	
+	}
+}
+
+bool MemoryTracer::checkOverWrittenAddressesById(uint32_t stateId, uint64_t address)
+{
+	if(address < 0xfffffff) //this is to hack the non pointer value in the captured parameters.
+		return true;
+
+	std::pair <std::multimap<uint32_t, uint64_t>::iterator, std::multimap<uint32_t, uint64_t>::iterator> ret;
+	ret = m_overWrittenAddressesId.equal_range(stateId);
+	for(overWrittenAddressesId::iterator it = ret.first; it != ret.second; ++it){
+		if(address > 0x0fffffff && it->second == address){
+			s2e()->getWarningsStream() << "Caution:: StateID: [ " << it->first << " ] " << 
+					"Over Written Addresses: " << it->second << '\n';
+			return true;
+		}
+	}
+
+	return false;
+}
+#endif
 
 void MemoryTracer::onDataMemoryAccess(S2EExecutionState *state,
                                klee::ref<klee::Expr> address,
