@@ -175,7 +175,7 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	char insnByte;
 	int intNum = -1;
 	
-	s2e()->getMemoryTypeStream() << "In the InterruptMonitor::onInterrupt, the flag_isInterceptedModules = [ " << flag_isInterceptedModules << " ]" << '\n';
+	//s2e()->getMemoryTypeStream() << "In the InterruptMonitor::onInterrupt, the flag_isInterceptedModules = [ " << flag_isInterceptedModules << " ]" << '\n';
 	if(!flag_isInterceptedModules){
 	//	return;
 	}

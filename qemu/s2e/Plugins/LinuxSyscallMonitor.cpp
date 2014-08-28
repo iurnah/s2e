@@ -106,10 +106,12 @@ void LinuxSyscallMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
 
 	if (tb->s2e_tb_type == TB_SYSENTER)
 	{
+		s2e()->getMemoryTypeStream() << "TB_SYSENTER Block intercepted" << '\n';
 		signal->connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onSysenter));
 	}
 	else if (tb->s2e_tb_type == TB_SYSEXIT)
 	{
+		s2e()->getMemoryTypeStream() << "TB_SYSEXIT Block intercepted" << '\n';
 		signal->connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onSysexit));
 	}
 
@@ -151,7 +153,7 @@ void LinuxSyscallMonitor::onSysenter(S2EExecutionState* state, uint64_t pc)
 
 	//s2e()->getWarningsStream() << m_returnSignals << '\n';
 
-//	s2e()->getDebugStream() << "SYSENTER return address 0x" << std::hex << eip << std::endl;
+	s2e()->getDebugStream() << "SYSENTER return address 0x" << hexval(eip) << '\n';
 	emitSyscallSignal(state, pc, SYSCALL_SYSENTER, plgState->m_returnSignals[eip].back());
 }
 
@@ -247,7 +249,7 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 	{
 		s2e()->getWarningsStream() << "Syscall with symbolic syscall number (EAX)!" << '\n';
 	} else {
-		s2e()->getWarningsStream() << "syscall number (EAX) read successfully!" << '\n';
+		//s2e()->getWarningsStream() << "syscall number (EAX) read successfully!" << '\n';
 		int argc = getSyscallInformation(eax).argcount;
 		switch(argc){
 			case 0:
