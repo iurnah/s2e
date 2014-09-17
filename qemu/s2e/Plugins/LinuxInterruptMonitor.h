@@ -1,5 +1,5 @@
 /*
- * InterruptMonitor.h
+ * LinuxInterruptMonitor.h
  *
  *  Created on: Dec 8, 2011
  *      Author: zaddach
@@ -12,6 +12,7 @@
 #include <s2e/S2EExecutionState.h>
 #include <s2e/Plugins/CorePlugin.h>
 #include <s2e/Plugins/LinuxExecutionDetector.h>
+#include <s2e/Plugins/LinuxCodeSelector.h>
 
 #include <map>
 #include <vector>
@@ -19,7 +20,7 @@
 namespace s2e {
 namespace plugins {
 
-class InterruptMonitor : public Plugin
+class LinuxInterruptMonitor : public Plugin
 {
 	S2E_PLUGIN
 
@@ -29,8 +30,8 @@ public:
 	typedef std::map< uint32_t, std::vector< InterruptReturnSignal > > ReturnSignalsMap;
 
 
-	InterruptMonitor(S2E* s2e);
-	virtual ~InterruptMonitor();
+	LinuxInterruptMonitor(S2E* s2e);
+	virtual ~LinuxInterruptMonitor();
 
 	void initialize();
 
@@ -43,30 +44,45 @@ public:
 	void slotTranslateBlockEnd(ExecutionSignal*, S2EExecutionState *state,
 	                               TranslationBlock *tb, uint64_t pc,
 	                               bool, uint64_t);
+/*
+	void onModuleTranslateBlockEnd(
+								ExecutionSignal *signal,
+								S2EExecutionState* state,
+								const ModuleDescriptor& md,
+								TranslationBlock *tb,
+								uint64_t endPc,
+								bool staticTarget,
+								uint64_t targetPc);
+*/
 	void onTranslateJumpStart(ExecutionSignal *signal,
 	                                             S2EExecutionState *state,
 	                                             TranslationBlock * tb,
 	                                             uint64_t pc, int jump_type);
+
 	void onInterruptReturn(S2EExecutionState* state, uint64_t pc);
 	void onInterrupt(S2EExecutionState*, uint64_t);
+
 private:
 //	bool m_initialized;
 	bool flag_isInterceptedModules;
 	std::set<std::string> m_interceptedModules;
 	LinuxExecutionDetector *m_executionDetector;
+	LinuxCodeSelector *m_LinuxCodeSelector;
+	sigc::connection m_onTranslateBlockEnd;
+
 };
 
-class InterruptMonitorState : public PluginState
+class LinuxInterruptMonitorState : public PluginState
 {
 private:
-	std::map<int, InterruptMonitor::InterruptSignal> m_signals;
-	InterruptMonitor::ReturnSignalsMap m_returnSignals;
-	InterruptMonitor* m_plugin;
+	std::map<int, LinuxInterruptMonitor::InterruptSignal> m_signals;
+	LinuxInterruptMonitor::ReturnSignalsMap m_returnSignals;
+	LinuxInterruptMonitor* m_plugin;
 public:
-	virtual InterruptMonitorState* clone() const;
+	virtual LinuxInterruptMonitorState* clone() const;
 	static PluginState *factory(Plugin *p, S2EExecutionState *s);
 
-	friend class InterruptMonitor;
+	friend class LinuxInterruptMonitor;
 };
 
 } //namespace plugins

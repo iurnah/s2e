@@ -33,60 +33,94 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef __MODULE_MONITOR_PLUGIN_H__
+#ifndef _RAWMONITOR_PLUGIN_H_
 
-#define __MODULE_MONITOR_PLUGIN_H__
+#define _RAWMONITOR_PLUGIN_H_
+
+#include <s2e/Plugins/ModuleDescriptor.h>
 
 #include <s2e/Plugin.h>
-#include <s2e/S2EExecutionState.h>
-#include "ModuleDescriptor.h"
-#include "ThreadDescriptor.h"
+#include <s2e/Plugins/CorePlugin.h>
+#include <s2e/Plugins/OSMonitor.h>
+
+#ifdef TARGET_I386
+
+#define PARAM0 regs[R_EAX]
+#define PARAM1 regs[R_EBX]
+#define PARAM2 regs[R_ECX]
+
+#elif TARGET_ARM
+
+#define PARAM0 regs[0]
+#define PARAM1 regs[1]
+#define PARAM2 regs[2]
+
+#endif
+
+#include <vector>
 
 namespace s2e {
 namespace plugins {
 
-/**
- *  Base class for default OS actions.
- *  It provides an interface for loading/unloading modules and processes.
- *  If you wish to add support for a new OS, implement this interface.
- *
- *  Note: several events use ModuleDescriptor as a parameter.
- *  The passed reference is valid only during the call. Do not store pointers
- *  to such objects, but make a copy instead.
- */
-class OSMonitor:public Plugin
+class LinuxMonitor:public OSMonitor
 {
-public:
-/* Linux Monitor signal definitions */
-	sigc::signal<void, S2EExecutionState*, const ModuleDescriptor & >onModuleLoad; 
-
-/* from the original OSMonitor */	
-	sigc::signal<void, S2EExecutionState*, const ModuleDescriptor &> onModuleUnload;
-	sigc::signal<void, S2EExecutionState*, uint64_t> onProcessUnload;
-	sigc::signal<void, S2EExecutionState*, const ThreadDescriptor&> onThreadCreate;
-	sigc::signal<void, S2EExecutionState*, const ThreadDescriptor&> onThreadExit;
-protected:
-   OSMonitor(S2E* s2e): Plugin(s2e) {}
+    S2E_PLUGIN
 
 public:
+    struct Cfg {
+        std::string name;
+        uint64_t start;
+        uint64_t size;
+        uint64_t nativebase;
+        uint64_t entrypoint;
+        bool delayLoad;
+        bool kernelMode;
+    };
 
-   virtual bool getImports(S2EExecutionState *s, const ModuleDescriptor &desc, Imports &I) = 0;
-   virtual bool getExports(S2EExecutionState *s, const ModuleDescriptor &desc, Exports &E) = 0;
-   virtual bool isKernelAddress(uint64_t pc) const = 0;
-   virtual uint64_t getPid(S2EExecutionState *s, uint64_t pc) = 0;
-   virtual bool getCurrentStack(S2EExecutionState *s, uint64_t *base, uint64_t *size) = 0;
+    struct OpcodeModuleConfig {
+        uint64_t name;
+        uint64_t nativeBase;
+        uint64_t loadBase;
+        uint64_t entryPoint;
+        uint64_t size;
+        uint32_t kernelMode;
+    } __attribute__((packed));
 
-   bool isOnTheStack(S2EExecutionState *s, uint64_t address) {
-       uint64_t base, size;
-       if (!getCurrentStack(s, &base, &size)) {
-           return false;
-       }
-       return address >= base && address < (base + size);
-   }
+    typedef std::vector<Cfg> CfgList;
+private:
+    CfgList m_cfg;
+    sigc::connection m_onTranslateInstruction;
 
+    uint64_t m_kernelStart;
+
+    Imports m_imports;
+
+	//expose to other plugins such as InterruptMonitor
+
+    void onCustomInstruction(S2EExecutionState* state, uint64_t opcode);
+    void opLoadModule(S2EExecutionState *state);
+
+public:
+    LinuxMonitor(S2E* s2e): OSMonitor(s2e) {}
+    virtual ~LinuxMonitor();
+    void initialize();
+
+    void onTranslateInstructionStart(ExecutionSignal *signal,
+                                     S2EExecutionState *state,
+                                     TranslationBlock *tb,
+                                     uint64_t pc);
+
+    virtual bool getImports(S2EExecutionState *s, const ModuleDescriptor &desc, Imports &I);
+    virtual bool getExports(S2EExecutionState *s, const ModuleDescriptor &desc, Exports &E);
+    virtual bool isKernelAddress(uint64_t pc) const;
+    virtual uint64_t getPid(S2EExecutionState *s, uint64_t pc);
+    virtual bool getCurrentStack(S2EExecutionState *state, uint64_t *base, uint64_t *size) {
+        return false;
+    }
 };
+
+
 
 } // namespace plugins
 } // namespace s2e
-
 #endif

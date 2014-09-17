@@ -64,7 +64,7 @@ LD_PRELOAD=../init_env.so ./open_init_env --select-process --sym-args 0 1 1; ../
 ./build/qemu-release/i386-softmmu/qemu-system-i386 your_image.raw
 # scp coping the test code to guest machine
 scp <your_login_on_host>@<your_host_name>:path/to/tutorial1.c .
-scp <your_login_on_host>@<your_host_name>:path/to/s2e/guest/include/s2e.h .=
+scp <your_login_on_host>@<your_host_name>:path/to/s2e/guest/include/s2e.h .
 # compile and run code in the guest
 gcc -O3 tutorial1.c -o tutorial1
 ./tutorial

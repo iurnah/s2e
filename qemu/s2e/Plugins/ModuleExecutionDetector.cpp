@@ -438,7 +438,7 @@ void ModuleExecutionDetector::onTranslateBlockEnd(
         return;
     }
 
-
+	/* gen_jmp_im: staticTarget=1, gen_op_jmp_T0: staticTarget=0 */
     if (staticTarget) {
         const ModuleDescriptor *targetModule =
             plgState->getDescriptor(m_Monitor->getPid(state, targetPc), targetPc);

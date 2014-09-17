@@ -11,8 +11,8 @@
 #include <s2e/Plugin.h>
 #include "CorePlugin.h"
 #include "InterruptMonitor.h"
-#include "./ExecutionTracers/MemoryTracer.h"
-#include "ModuleExecutionDetector.h"
+//#include "./ExecutionTracers/MemoryTracer.h"
+#include "LinuxExecutionDetector.h"
 
 #include <vector>
 #include <map>
@@ -123,9 +123,9 @@ private:
 	static SyscallInformation m_syscallInformation[];
 	bool m_initialized;
 
-	MemoryTracer *m_MemoryTracer; //Rui: for checking the overWrittenAddresses
+	//MemoryTracer *m_MemoryTracer; //Rui: for checking the overWrittenAddresses
 
-	ModuleExecutionDetector *m_detector; //add by sun for track configured modules
+	LinuxExecutionDetector *m_detector; //add by sun for track configured modules
 	void onModuleLoad(
 		S2EExecutionState* state,
 		const ModuleDescriptor &module

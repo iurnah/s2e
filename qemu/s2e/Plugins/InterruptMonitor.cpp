@@ -25,11 +25,12 @@ using std::map;
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(InterruptMonitor, "software interrupt monitoring plugin", "InterruptMonitor", "ModuleExecutionDetector");
+S2E_DEFINE_PLUGIN(InterruptMonitor, "software interrupt monitoring plugin", "InterruptMonitor", "LinuxExecutionDetector");
+
 
 void InterruptMonitor::initialize()
 {
-	m_executionDetector = (ModuleExecutionDetector*)s2e()->getPlugin("ModuleExecutionDetector");
+	m_executionDetector = (LinuxExecutionDetector*)s2e()->getPlugin("LinuxExecutionDetector");
     assert(m_executionDetector);
 	
 	//Fetch the list of modules where forking should be enabled
@@ -215,13 +216,11 @@ void InterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 
 	//Generate a signal that will be called once the interrupt returns
 	//TODO: make object handling of signals more efficient
-
 	plgState->m_returnSignals[pc + 2].push_back(InterruptReturnSignal());
 	InterruptReturnSignal& returnSignal = plgState->m_returnSignals[pc + 2].back();
 
 	//Find and notify signals for this interrupt no
 	std::map<int, InterruptSignal>::iterator itr = plgState->m_signals.find(intNum);
-
 	if (itr != plgState->m_signals.end())
 	{
 		itr->second.emit(state, pc, intNum, returnSignal);

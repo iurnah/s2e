@@ -204,10 +204,25 @@ static void register_module(procmap_entry_t *proc_map, const char *name)
         #ifndef DEBUG_NATIVE
 
         uint64_t size = cur_proc->limit - cur_proc->base;
-        s2e_moduleexec_add_module(base, base, 0);
-        s2e_rawmon_loadmodule2(base, cur_proc->base, cur_proc->base, 0, size, 0);
+        //s2e_moduleexec_add_module(base, base, 0);
+        s2e_rawmon_loadmodule2(base, cur_proc->base, cur_proc->limit, 0, size, 0);
         #endif
     }
+}
+
+static void register_sharedlibs(procmap_entry_t *map)
+{
+	while(map->base && map->limit){
+		if(strstr(map->name,".so")){
+			const char *base_name = __base_name(map->name);
+			myprintf("Registering module: %s (%s) %"PRIxPTR" %"PRIxPTR"\n",
+					map->name, base_name, map->base, map->limit);
+			uint64_t size = map->limit - map->base;
+			s2e_rawmon_loadmodule2(base_name, map->base, map->limit, 0, size, 0);
+								// name, base, limit, entrypoint, size, kernelmod
+		}
+		++map;
+	}
 }
 
 static void __s2e_init_env(int *argcPtr, char ***argvPtr)
@@ -231,7 +246,9 @@ static void __s2e_init_env(int *argcPtr, char ***argvPtr)
     procmap_entry_t* proc_map = load_process_map();
     display_process_map(proc_map);
     register_module(proc_map, argv[0]);
-    register_module(proc_map, "init_env.so");
+    //register_module(proc_map, "init_env.so");
+	register_sharedlibs(proc_map);
+
 
     #ifndef DEBUG_NATIVE
     s2e_codeselector_select_module("init_env.so");

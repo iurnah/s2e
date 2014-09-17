@@ -18,7 +18,7 @@ extern "C" {
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(LinuxSyscallMonitor, "Linux syscall monitoring plugin", "LinuxSyscallMonitor", "MemoryTracer");  //add by sun for special module
+S2E_DEFINE_PLUGIN(LinuxSyscallMonitor, "Linux syscall monitoring plugin", "LinuxSyscallMonitor");  //add by sun for special module
 
 static const int TP = 0x1;
 static const int TD = 0x2;
@@ -46,12 +46,13 @@ LinuxSyscallMonitor::~LinuxSyscallMonitor() {
 void LinuxSyscallMonitor::initialize()
 {
 
-	m_detector = static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));  // add by sun for special module
-
+	m_detector = static_cast<LinuxExecutionDetector*>(s2e()->getPlugin("LinuxExecutionDetector"));  // add by sun for special module
+#if 0
 	m_MemoryTracer = static_cast<MemoryTracer*>(s2e()->getPlugin("MemoryTracer"));  
 
 	if(m_MemoryTracer)
 		s2e()->getDebugStream() << "MemoryTracer imported" << '\n';
+#endif
 
 	s2e()->getCorePlugin()->onTranslateBlockEnd.connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onTranslateBlockEnd));
 	
@@ -106,12 +107,12 @@ void LinuxSyscallMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
 
 	if (tb->s2e_tb_type == TB_SYSENTER)
 	{
-		s2e()->getMemoryTypeStream() << "TB_SYSENTER Block intercepted" << '\n';
+		s2e()->getDebugStream() << "TB_SYSENTER Block intercepted" << '\n';
 		signal->connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onSysenter));
 	}
 	else if (tb->s2e_tb_type == TB_SYSEXIT)
 	{
-		s2e()->getMemoryTypeStream() << "TB_SYSEXIT Block intercepted" << '\n';
+		s2e()->getDebugStream() << "TB_SYSEXIT Block intercepted" << '\n';
 		signal->connect(sigc::mem_fun(*this, &LinuxSyscallMonitor::onSysexit));
 	}
 
@@ -302,7 +303,45 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 	}
 
 	plgState->m_allSyscallsSignal.emit(state, pc, syscall_type, eax, signal);
-	
+
+	//TODO: 1. try to print the imported data structure from memory trace.
+	//		2. add the check with the memory tracer, should match the state also. 
+	target_ulong cr3 = state->readCpuState(CPU_OFFSET(cr[3]), sizeof(target_ulong) * 8);
+	int argc = getSyscallInformation(eax).argcount;
+	s2e()->getWarningsStream(state) << "PID=" << hexval(cr3) << ", PC=" << hexval(pc) << ", SYSCALLNO:" << eax << " = "  
+			<< getSyscallInformation(eax).name << ", (argN=" << getSyscallInformation(eax).argcount << ") " << "\n";
+	switch(argc){
+		case 0: 
+		case 1: s2e()->getWarningsStream() << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n';
+				break;
+		case 2: s2e()->getWarningsStream() << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n'
+											 << hexval(s.ecx) << " = " << getSyscallInformation(eax).arg1 << '\n';
+				break;
+		case 3: s2e()->getWarningsStream() << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n'
+											 << hexval(s.ecx) << " = " << getSyscallInformation(eax).arg1 << '\n'
+											 << hexval(s.edx) << " = " << getSyscallInformation(eax).arg2 << '\n';
+				break;
+		case 4: s2e()->getWarningsStream() << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n'
+											 << hexval(s.ecx) << " = " << getSyscallInformation(eax).arg1 << '\n'
+											 << hexval(s.edx) << " = " << getSyscallInformation(eax).arg2 << '\n'
+											 << hexval(s.esi) << " = " << getSyscallInformation(eax).arg3 << '\n';
+				break;
+		case 5: s2e()->getWarningsStream() << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n'
+											 << hexval(s.ecx) << " = " << getSyscallInformation(eax).arg1 << '\n'
+											 << hexval(s.edx) << " = " << getSyscallInformation(eax).arg2 << '\n'
+											 << hexval(s.esi) << " = " << getSyscallInformation(eax).arg3 << '\n'
+											 << hexval(s.edi) << " = " << getSyscallInformation(eax).arg4 << '\n';
+				break;
+	}
+#if 0	
+	s2e()->getWarningsStream(state) << "PID=" << hexval(cr3) << ", PC=" << hexval(pc) << ", SYSCALLNO:" << eax << " = "  
+			<< getSyscallInformation(eax).name << ", (argN=" << getSyscallInformation(eax).argcount << ") " << "\n" << "***************  "
+			<< hexval(s.ebx) << " =" << getSyscallInformation(eax).arg0 << " | " <<  hexval(s.ecx) << " =" << getSyscallInformation(eax).arg1 << " | " 
+			<< hexval(s.edx) << " =" << getSyscallInformation(eax).arg2 << " | " <<  hexval(s.esi) << " =" << getSyscallInformation(eax).arg3 << " | "
+			<< hexval(s.edi) << " =" << getSyscallInformation(eax).arg4 << "\n" << "***************"
+			<< "EBP = " << hexval(s.ebp) << "\n" << "***************"
+			<< "ESP = " << hexval(s.esp) << "\n";
+
 	//Now the parameter data is all in the map, before print out, we have to check several
 	//things, i.e. whether it is a pointer? whether it is a memory address that
 	//has been overwritten.
@@ -312,39 +351,9 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
 			s2e()->getMemoryTypeStream(state) << hexval(it->first) << " is " << it->second << " By Syscall: " << getSyscallInformation(eax).name << '\n';	
 		}
 	}
-#if 0
-	//TODO: 1. try to print the imported data structure from memory trace.
-	//		2. add the check with the memory tracer, should match the state also. 
-	switch(argc){
-		case 0: 
-		case 1: s2e->getWarningStream(state) << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n';
-		case 2: s2e->getWarningStream(state) << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(eax).arg1 << '\n';
-		case 3: s2e->getWarningStream(state) << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(eax).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(eax).arg2 << '\n';
-		case 4: s2e->getWarningStream(state) << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(eax).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(eax).arg2 << '\n';
-											 << hexval(s.esi) << " = " << getSyscallInformation(eax).arg3 << '\n';
-		case 5: s2e->getWarningStream(state) << hexval(s.ebx) << " = " << getSyscallInformation(eax).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(eax).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(eax).arg2 << '\n';
-											 << hexval(s.esi) << " = " << getSyscallInformation(eax).arg3 << '\n';
-											 << hexval(s.edi) << " = " << getSyscallInformation(eax).arg4 << '\n';
-		case 6: 
-		case 7: 
-	}
-	
-	s2e()->getWarningsStream(state) << "PID=" << hexval(cr3) << ", PC=" << hexval(pc) << ", SYSCALLNO:" << eax << " = "  
-			<< getSyscallInformation(eax).name << ", (argN=" << getSyscallInformation(eax).argcount << ") " << "\n" << "***************  "
-			<< hexval(s.ebx) << " =" << getSyscallInformation(eax).arg0 << " | " <<  hexval(s.ecx) << " =" << getSyscallInformation(eax).arg1 << " | " 
-			<< hexval(s.edx) << " =" << getSyscallInformation(eax).arg2 << " | " <<  hexval(s.esi) << " =" << getSyscallInformation(eax).arg3 << " | "
-			<< hexval(s.edi) << " =" << getSyscallInformation(eax).arg4 << "\n" << "***************"
-			<< "EBP = " << hexval(s.ebp) << "\n" << "***************"
-			<< "ESP = " << hexval(s.esp) << "\n";
-
 #endif
+
+}
 /*	
 	s2e()->getDebugStream(state) << hexval(pc)  << ": System call " << eax  << "/" <<
 			getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
@@ -360,7 +369,6 @@ void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t p
     //s2e()->getMessagesStream(state) << "0x" << hexval(pc)  << ": System call 0x" << hexval(eax)  << "/" <<
 	//							getSyscallInformation(eax).name << " (" << syscall_type << ") in process " <<  hexval(cr3) << '\n';
 	//s2e()->getMessagesStream(state) << "21 "<< "'\n";
-}
 
 #if 0
 void LinuxSyscallMonitor::emitSyscallSignal(S2EExecutionState* state, uint64_t pc, SyscallType syscall_type, SyscallReturnSignal& signal)
