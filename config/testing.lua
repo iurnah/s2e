@@ -19,9 +19,10 @@ plugins = {
   --"TranslationBlockTracer", --
   --"ModuleTracer",
   --"TestCaseGenerator",
-  --"LinuxInterruptMonitor",
-  "InterruptMonitor",
+  --"InterruptMonitor",  
+  "LinuxInterruptMonitor",
   "LinuxSyscallMonitor",
+  "DataStructureMonitor",
   --"X86FunctionMonitor",
   --"LibraryCallMonitor",
 
@@ -35,14 +36,21 @@ pluginsConfig.LinuxMonitor = {
 }
 
 pluginsConfig.LinuxExecutionDetector = {
-  init_env_id = { --have to remove the dot here and to process in the assignement process.
-    moduleName = "init_env.so",
-    kernelMode = false,
-  },
   prog2 = {
     moduleName = "prog2",
     kernelMode = false,	
   },
+
+  init_env_id = { --have to remove the dot here and to process in the assignement process.
+    moduleName = "init_env.so",
+    kernelMode = false,
+  },
+
+  libc = {
+    moduleName = "libc-2.13.so",
+    kernelMode = false,	
+  },
+
   trackAllModules = true,
   configureAllModules = false  
 }
@@ -55,16 +63,30 @@ pluginsConfig.LinuxCodeSelector = {
 	moduleIds = { "prog2", "init_env.so" }
 }
 
-pluginsConfig.InterruptMonitor = {
-	moduleIds = { "prog2", "init_env.so" }
+pluginsConfig.LinuxInterruptMonitor = {
+--specify the module in which the interrupt will be intercepted
+	moduleIds = { "prog2", "libc-2.13.so" }
 }
 
+pluginsConfig.LinuxSyscallMonitor = {
+--specify the module in which the syscalls will be intercepted
+	--moduleIds = { "prog2", "init_env.so" }
+	moduleIds = { "prog2", "libc-2.13.so" }
+
+}
+
+pluginsConfig.DataStructureMonitor = {
+--specify the module in which the interested module will be analyzed
+	moduleIds = { "prog2", "libc-2.13.so" }
+
+}
+
+--[[
 pluginsConfig.MemoryTracer = {
 	monitorMemory = true,
 	monitorModules = true,
 }
 
---[[
 pluginsConfig.X86FunctionMonitor = {
 	moduleIds = { "prog2", "init_env.so" }
 }
@@ -85,9 +107,7 @@ pluginsConfig.TestCaseGenerator = {
 
 }
 
-pluginsConfig.LinuxSyscallMonitor = {
 
-}
 
 pluginsConfig.LibraryCallMonitor = {
 

@@ -5,8 +5,8 @@
  *      Author: zaddach
  */
 
-#ifndef INTERRUPTMONITOR_H_
-#define INTERRUPTMONITOR_H_
+#ifndef _S2E_PLUGINS_INTERRUPTMONITOR_H_
+#define _S2E_PLUGINS_INTERRUPTMONITOR_H_
 
 #include <s2e/Plugin.h>
 #include <s2e/S2EExecutionState.h>
@@ -26,7 +26,7 @@ class LinuxInterruptMonitor : public Plugin
 
 public:
 	typedef sigc::signal< void, S2EExecutionState*, uint64_t > InterruptReturnSignal;
-	typedef sigc::signal< void, S2EExecutionState*, uint64_t, int, InterruptReturnSignal& > InterruptSignal;
+	typedef sigc::signal< void, S2EExecutionState*, uint64_t, int> InterruptSignal;
 	typedef std::map< uint32_t, std::vector< InterruptReturnSignal > > ReturnSignalsMap;
 
 
@@ -61,6 +61,7 @@ public:
 
 	void onInterruptReturn(S2EExecutionState* state, uint64_t pc);
 	void onInterrupt(S2EExecutionState*, uint64_t);
+	InterruptSignal onInterruptIntercepted; //signal
 
 private:
 //	bool m_initialized;
@@ -75,10 +76,11 @@ private:
 class LinuxInterruptMonitorState : public PluginState
 {
 private:
-	std::map<int, LinuxInterruptMonitor::InterruptSignal> m_signals;
 	LinuxInterruptMonitor::ReturnSignalsMap m_returnSignals;
 	LinuxInterruptMonitor* m_plugin;
 public:
+	std::map<int, LinuxInterruptMonitor::InterruptSignal> m_signals;
+
 	virtual LinuxInterruptMonitorState* clone() const;
 	static PluginState *factory(Plugin *p, S2EExecutionState *s);
 

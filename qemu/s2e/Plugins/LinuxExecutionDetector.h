@@ -33,18 +33,16 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef __MODULE_EXECUTION_DETECTOR_H_
+#ifndef __Linux_EXECUTION_DETECTOR_H_
 
-#define __MODULE_EXECUTION_DETECTOR_H_
-
-#include <s2e/Plugins/ModuleDescriptor.h>
+#define __Linux_EXECUTION_DETECTOR_H_
 
 #include <s2e/Plugin.h>
 #include <s2e/Plugins/CorePlugin.h>
 #include <s2e/Plugins/OSMonitor.h>
+#include <s2e/Plugins/ModuleDescriptor.h>
 
 #include <inttypes.h>
-#include "OSMonitor.h"
 
 #ifdef TARGET_I386
 

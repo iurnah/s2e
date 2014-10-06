@@ -126,6 +126,8 @@ void LinuxExecutionDetector::initializeConfiguration()
         s << getConfigKey() << "." << *it << ".";
 		if(*it == "init_env_id")
 	        d.id = "init_env.so";
+		else if(*it == "libc")
+			d.id = "libc-2.13.so";
 		else
 			d.id = *it;
 
@@ -288,7 +290,7 @@ void LinuxExecutionDetector::onTranslateBlockEnd(
 
 	if(currentModule){
 		onModuleTranslateBlockEnd.emit(signal, state, *currentModule, tb, endPc, staticTarget, targetPc);
-		s2e()->getDebugStream() << "LinuxExecutionDetector::onTranslateBlockEnd: currentModule=" << currentModule->Name << " PC=" << hexval(endPc) << '\n';
+		//s2e()->getDebugStream() << "LinuxExecutionDetector::onTranslateBlockEnd: currentModule=" << currentModule->Name << " PC=" << hexval(endPc) << '\n';
 	}
 
 }

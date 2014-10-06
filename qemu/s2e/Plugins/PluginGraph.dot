@@ -1,0 +1,106 @@
+digraph g {
+node [
+fontsize = "16"
+shape = "record"
+];
+
+edge [
+arrowtail = "empty"
+];
+
+
+/*
+init_env [
+	label = "{init_env|+ \l|}"
+	shape = "record"
+]
+
+BaseInstructions [
+	label = "{BaseInstructions|+ \l|}"
+	shape = "record"
+]
+*/
+
+"LinuxMonitor" [
+	label = "{LinuxMonitor|+onCustomInstruction(state, opcode) \l|+opLoadModule(state)\l|<f18>	-onModuleLoad.emit(state, mdDesc)\l}"
+	shape = "record"
+	
+]
+
+"S2EExecutionState" [
+	label = "{S2EExecutionState|<f14>-ExecutionSignal(emited during execution)}"
+	shape = "record"
+]
+
+"LinuxExecutionDetector" [
+	label = "{LinuxExecutionDetector|<f19>+onModuleLoad()\l|+onTranslateBlockStart()\l|	-signal.connect(onExecution)\l|+onTranslateBlockEnd()\l|<f17>	+onExecution()\l|<f0>		-onModuleTransition.emit()\l}"
+	shape = "record"
+]
+
+LinuxCodeSelector [
+	label = "{LinuxCodeSelector|+onCustomInstruction(state, opcode)\l|	+opSelectModule()\l|<f1>-onModuleTransition()\l|<f2>	-onModuleTransitionSelector.emit()\l|}"
+	shape = "record"
+]
+
+LinuxInterruptMonitor [
+	label = "{LinuxInterruptMonitor|<f3>+Selector.connect(onModuleTransition)\l|+onModuleTransition\l|	-Core.connect(onTranslateBlockEnd)\l|+onTranslateBlockEnd()\l|	-signal.connect(onInterrupt)\l|<f15>+onInterrupt\l|<f6>	-InterruptSignal.emit()\l}"
+	shape = "record"
+]
+
+LinuxSyscallMonitor [
+	label = "{LinuxSyscallMonitor|<f4>+Selector.connect(onModuleTransition)\l|+onModuleTransition\l|	-Core.connect(onTranslateBlockEnd)\l|+onTranslateBlockEnd()\l|<f12>	-InterruptSignal.connect(onInt80)\l|<f13>	-signal.connect(onSysenter)\l|<f7>+onInt80\l|<f8>	-SyscallSignal.emit(INT)\l|<f16>+onSysenter\l|<f9>	-SyscallSignal.emit(ENTER)\l}"
+	shape = "record"
+]
+
+DataStructureMonitor [
+		label = "{DataStructureMonitor|<f5>+Selector.connect(onModuleTransition)\l|+onModuleTransition\l|	-onTranslateBlockEnd.connect()\l|+onTranslateBlockEnd()\l|	-SyscallSignal.connect(onSysenterSyscallSignal)\l|	-SyscallSignal.connect(onInt80SyscallSignal)\l|<f10>+onSysenterSyscallSignal\l|	Do the Jobs\l|<f11>+onInt80SyscallSignal\l|	Do the Jobs also\l}"
+	shape = "record"
+]
+
+"LinuxExecutionDetector":f0 -> "LinuxCodeSelector":f1 [
+id = 0
+label="0"
+]
+
+"LinuxCodeSelector":f2 -> "LinuxInterruptMonitor":f3 [
+id = 1
+label="1"
+]
+
+"LinuxCodeSelector":f2 -> "LinuxSyscallMonitor":f4 [
+id = 2
+]
+
+"LinuxCodeSelector":f2 -> "DataStructureMonitor":f5 [
+id = 3
+]
+
+"LinuxInterruptMonitor": f6 -> "LinuxSyscallMonitor": f7 [
+id = 4
+]
+
+"LinuxSyscallMonitor": f8 -> "DataStructureMonitor": f10 [
+id = 5
+]
+
+"LinuxSyscallMonitor": f9 -> "DataStructureMonitor": f11 [
+id = 6
+]
+
+"S2EExecutionState": f14 -> "LinuxInterruptMonitor": f15[
+id = 7
+]
+
+"S2EExecutionState": f14 -> "LinuxSyscallMonitor": f16[
+id = 8
+]
+
+"S2EExecutionState": f14 -> "LinuxExecutionDetector": f17[
+id = 9
+]
+
+"LinuxMonitor": f18 -> "LinuxExecutionDetector": f19[
+id = 10
+]
+
+}

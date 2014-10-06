@@ -4,6 +4,13 @@
  *  Created on: Dec 8, 2011
  *      Author: zaddach
  */
+/* 
+ * Modified on: Sept 26, 2014
+ * 
+ *		By: Rui 
+ * 
+ */
+
 
 extern "C" {
 #include "config.h"
@@ -25,7 +32,8 @@ using std::map;
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(LinuxInterruptMonitor, "software interrupt monitoring plugin", "LinuxInterruptMonitor", "LinuxExecutionDetector", "LinuxCodeSelector");
+S2E_DEFINE_PLUGIN(LinuxInterruptMonitor, "software interrupt monitoring plugin", 
+				"LinuxInterruptMonitor", "LinuxExecutionDetector", "LinuxCodeSelector");
 
 
 void LinuxInterruptMonitor::initialize()
@@ -36,6 +44,7 @@ void LinuxInterruptMonitor::initialize()
 	//Fetch the list of modules where forking should be enabled
     ConfigFile *cfg = s2e()->getConfig();
 	bool ok = false;
+
     ConfigFile::string_list moduleList =
             cfg->getStringList(getConfigKey() + ".moduleIds", ConfigFile::string_list(), &ok);
 
@@ -54,9 +63,14 @@ void LinuxInterruptMonitor::initialize()
         }
     }
 
+	//we use onModuleTransitionSelector from LinuxCodeSelector to enable signal
+	//emition from the interested module.
 	m_LinuxCodeSelector->onModuleTransitionSelector.connect(sigc::mem_fun(*this, &LinuxInterruptMonitor::onModuleTransition));
 }
 
+// This member function connect onTranslateBlockEnd from CorePlugins to make
+// sure we intercept interrupt instruction inside the module we are interested,
+// and ignore all other interrupt signals.
 void LinuxInterruptMonitor::onModuleTransition(
         S2EExecutionState *state,
         const ModuleDescriptor *prevModule,
@@ -67,53 +81,60 @@ void LinuxInterruptMonitor::onModuleTransition(
 		if(!m_onTranslateBlockEnd.connected()){
 			m_onTranslateBlockEnd = s2e()->getCorePlugin()->onTranslateBlockEnd.connect(
 							sigc::mem_fun(*this, &LinuxInterruptMonitor::slotTranslateBlockEnd));
+
+			s2e()->getDebugStream() << "LinuxInterruptMonitor::onTranslateBlockEnd: Disconnect onTranslateBlockEnd!" << "\n";
 		}
 	}else{//disable intercept the interrupt signals.
-		s2e()->getDebugStream() << "LinuxInterruptMonitor::error in configure intercepted module" << "\n";
 		m_onTranslateBlockEnd.disconnect();		
+		s2e()->getDebugStream() << "LinuxInterruptMonitor::onTranslateBlockEnd: Disconnect onTranslateBlockEnd!" << "\n";
 	}
 }
 
-//TODO: add a exitModule() function and corresponding siganl to disconnect the
-//signal
-
+// When this member function has been called, it connect to the runtime signal
+// that once executed, will emit signals to S2E plugin to involke the callback
+// function onInterrupt()
 void LinuxInterruptMonitor::slotTranslateBlockEnd(ExecutionSignal *signal,
                                       S2EExecutionState *state,
                                       TranslationBlock *tb,
                                       uint64_t pc, bool, uint64_t)
 {
-	if (tb->s2e_tb_type == TB_INTERRUPT) //XXX: Currently not be able to detect TB_INTERRUPT
+	if (tb->s2e_tb_type == TB_INTERRUPT) 
 	{
 		signal->connect(sigc::mem_fun(*this, &LinuxInterruptMonitor::onInterrupt));
 	}
 }
 
+// This member function has everything it needed to parse the interrupt
+// instruction in order to get the interrupt number, and finally emit the
+// interruptSignall
 void LinuxInterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 {
+
+	DECLARE_PLUGINSTATE(LinuxInterruptMonitorState, state);
+
 	char insnByte;
 	int intNum = -1;
 
-	if(!flag_isInterceptedModules){
-	//	return;
-	}
-
 	if (!state->readMemoryConcrete(pc, &insnByte, 1))
 	{
-		s2e()->getWarningsStream() << "Could not read interrupt instruction at 0x" << hexval(pc) << '\n';// << std::dec << '\n';
+		s2e()->getWarningsStream() << "Could not read interrupt instruction at 0x" 
+				<< hexval(pc) << '\n';// << std::dec << '\n';
+
 		return;
 	}
 
-	if ((insnByte & 0xFF) == 0xCC)
+	if ((insnByte & 0xFF) == 0xCC) //INT 3, debugging purpose interrupt
 	{
 		intNum = 3;
 	}
-	else if ((insnByte & 0xFF) == 0xCD)
+	else if ((insnByte & 0xFF) == 0xCD) //general interrupt instructions 
 	{
 		unsigned char intNumByte;
 
 		if (!state->readMemoryConcrete(pc + 1, &intNumByte, 1))
 		{
-			s2e()->getWarningsStream() << "Could not read interrupt index at 0x" << hexval(pc)<< '\n';// << std::dec << '\n';
+			s2e()->getWarningsStream() << "Could not read interrupt index at 0x" 
+					<< hexval(pc)<< '\n';// << std::dec << '\n';
 			return;
 		}
 
@@ -122,14 +143,40 @@ void LinuxInterruptMonitor::onInterrupt(S2EExecutionState* state, uint64_t pc)
 	else
 	{
 		/* Invalid Opcode */
-		s2e()->getWarningsStream() << "Unexpected opcode 0x" << hexval((unsigned int) insnByte)	<< " at 0x" << hexval(pc) << ", expected 0xcc or 0xcd" << '\n';//std::dec << '\n';
+		s2e()->getWarningsStream() << "Unexpected opcode 0x" 
+				<< hexval((unsigned int) insnByte)	<< " at 0x" 
+				<< hexval(pc) << ", expected 0xcc or 0xcd" << '\n';
+
 		return;
 	}
 
 	assert(intNum != -1);
-	if(intNum == 0x80){
-		s2e()->getDebugStream() << "LinuxInterruptMonitor::Received interrupt " << hexval(intNum) << " at 0x" << hexval(pc) << '\n';
-	}
+
+	s2e()->getDebugStream(state) << "LinuxInterruptMonitor::Received interrupt " 
+				<< hexval(intNum) << " at 0x" << hexval(pc) << '\n';
+
+		//TODO emit interrupt signal, the signal should managed by the plugin state, 
+		//it should be in the current plugin state 
+		//candidate signal parameters: state, pc, intNum, eax_val, returnSignal
+	std::map<int, InterruptSignal>::iterator itr = plgState->m_signals.find(intNum);
+	if(itr != plgState->m_signals.end()){
+		itr->second.emit(state, pc, intNum);
+	}else 
+		s2e()->getDebugStream(state) << "LinuxInterruptMonitor::InterruptSignal didn't emitted for interrupt =" 
+				<< hexval(intNum) << " at 0x" << hexval(pc) << '\n';
+
+	//plgState->m_signals[-1].emit(state, pc, intNum, returnSignal);
+}
+
+LinuxInterruptMonitor::InterruptSignal& LinuxInterruptMonitor::getInterruptSignal(S2EExecutionState* state, int interrupt)
+{
+
+	DECLARE_PLUGINSTATE(LinuxInterruptMonitorState, state);
+
+	assert (interrupt >= -1 && interrupt <= 0xff);
+
+	return plgState->m_signals[interrupt];
+	
 }
 
 LinuxInterruptMonitor::LinuxInterruptMonitor(S2E* s2e) : Plugin(s2e)
@@ -144,7 +191,7 @@ LinuxInterruptMonitor::~LinuxInterruptMonitor() {
 LinuxInterruptMonitorState* LinuxInterruptMonitorState::clone() const
 {
     LinuxInterruptMonitorState *ret = new LinuxInterruptMonitorState(*this);
-//    m_plugin->s2e()->getDebugStream() << "Forking FunctionMonitorState ret=" << std::hex << ret << '\n';
+//    m_plugin->s2e()->getDebugStream() << "  ret=" << stdhex << ret << '\n';
     assert(ret->m_returnSignals.size() == m_returnSignals.size());
     return ret;
 }

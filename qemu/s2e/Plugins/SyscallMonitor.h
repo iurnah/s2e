@@ -5,10 +5,14 @@
  *      Author: zaddach
  */
 
-#ifndef _S2E_PLUGINS_LINUXSYSCALLMONITOR_H_
-#define _S2E_PLUGINS_LINUXSYSCALLMONITOR_H_
+#ifndef SYSCALLMONITOR_H_
+#define SYSCALLMONITOR_H_
 
-#include "LinuxInterruptMonitor.h"
+#include <s2e/Plugin.h>
+#include "CorePlugin.h"
+#include "InterruptMonitor.h"
+//#include "./ExecutionTracers/MemoryTracer.h"
+#include "ModuleExecutionDetector.h"
 
 #include <vector>
 #include <map>
@@ -39,29 +43,15 @@ namespace plugins {
  *  The end of a syscall is detected by monitoring for the corresponding IRET (for INT entry) or SYSEXIT (for SYSENTER entry)
  *  instruction.
  */
-enum ESyscallType {SYSCALL_INT, SYSCALL_SYSENTER, SYSCALL_SYSCALL};
-typedef ESyscallType SyscallType;
-
 class LinuxSyscallMonitor : public Plugin
 {
 	S2E_PLUGIN
-
-	std::set<std::string> m_interceptedModules;
-
-	bool m_onInt80Connected;
-
-	LinuxExecutionDetector *m_executionDetector; 
-	LinuxCodeSelector *m_LinuxCodeSelector;
-	LinuxInterruptMonitor *m_LinuxInterruptMonitor;
-
-	sigc::connection m_onTranslateBlockEnd;
 public:
 	
-//	int spe_pid; //add by sun for special module
+	int spe_pid; //add by sun for special module
 	
-//	static const int MAX_SYSCALL_NR = 444;
-//	enum ESyscallType {SYSCALL_INT, SYSCALL_SYSENTER, SYSCALL_SYSCALL};
-
+	static const int MAX_SYSCALL_NR = 444;
+	enum ESyscallType {SYSCALL_INT, SYSCALL_SYSENTER, SYSCALL_SYSCALL};
 /*
 	struct SSyscallInformation
 	{
@@ -70,6 +60,7 @@ public:
 		const char * name;
 		int misc;
 	};
+*/
 	struct SSyscallInformation
 	{
 		int index;
@@ -96,46 +87,49 @@ public:
 	   uint32_t eip;
 	   uint32_t cr2;
 	}s;
-*/
 
 	typedef std::map<uint64_t, const char *> addrTypes;
 
-//	typedef enum ESyscallType SyscallType;
-	//typedef struct SSyscallInformation SyscallInformation;
+	typedef enum ESyscallType SyscallType;
+	typedef struct SSyscallInformation SyscallInformation;
 	typedef sigc::signal<void, S2EExecutionState*, uint64_t> SyscallReturnSignal;
-	typedef sigc::signal<void, S2EExecutionState*, uint64_t, SyscallType,/*INT/SYSCALL/SYSENTER*/ uint32_t> SyscallSignal;
+	typedef sigc::signal<void, S2EExecutionState*, uint64_t, SyscallType, uint32_t, SyscallReturnSignal& > SyscallSignal;
 	typedef std::map< uint32_t, std::vector< LinuxSyscallMonitor::SyscallReturnSignal > > SyscallReturnSignalsMap;
 
 	LinuxSyscallMonitor(S2E*);
 	virtual ~LinuxSyscallMonitor();
 
 	void initialize();
-	
-	void onModuleTransition(
-        S2EExecutionState *state,
-        const ModuleDescriptor *prevModule,
-        const ModuleDescriptor *currentModule);
+	void onGen_LoadStore(ExecutionSignal *signal,
+							S2EExecutionState *state, 
+							TranslationBlock *tb,
+							uint64_t pc, int dest, int src);
 
 	void onTranslateBlockEnd(ExecutionSignal *signal,
 	                                          S2EExecutionState *state,
 	                                          TranslationBlock *tb,
 	                                          uint64_t pc, bool, uint64_t);
-
-	void onInt80(S2EExecutionState* state, uint64_t pc, int interruptNum);
 	void onSysenter(S2EExecutionState* state, uint64_t pc);
 	void onSysexit(S2EExecutionState* state, uint64_t pc);
-	//void onInt80(S2EExecutionState* state, uint64_t pc, int int_num, LinuxInterruptMonitor::InterruptReturnSignal& signal);
-	//static const SyscallInformation& getSyscallInformation(int syscallNr);
-	SyscallSignal& getSyscallSignal(S2EExecutionState* state, SyscallType type);
+	void onInt80(S2EExecutionState* state, uint64_t pc, int int_num, InterruptMonitor::InterruptReturnSignal& signal);
+	static const SyscallInformation& getSyscallInformation(int syscallNr);
+	SyscallSignal& getSyscallSignal(S2EExecutionState* state, int syscallNr);
 	SyscallSignal& getAllSyscallsSignal(S2EExecutionState* state);
 
-	SyscallSignal onInt80SyscallSignal;
-	SyscallSignal onSysenterSyscallSignal;
-	
-
-	SyscallSignal craftedSyscallsignal;
+	//bool isPointer(uint32_t realParameters);
 protected:
 	void emitSyscallSignal(S2EExecutionState* state, uint64_t pc, SyscallType syscall_type, SyscallReturnSignal& signal);
+private:
+	static SyscallInformation m_syscallInformation[];
+	bool m_initialized;
+
+	//MemoryTracer *m_MemoryTracer; //Rui: for checking the overWrittenAddresses
+
+	LinuxExecutionDetector *m_detector; //add by sun for track configured modules
+	void onModuleLoad(
+		S2EExecutionState* state,
+		const ModuleDescriptor &module
+	);  //add by sun for special modules
 
 };
 
@@ -143,16 +137,12 @@ class LinuxSyscallMonitorState : public PluginState
 {
 private:
 	LinuxSyscallMonitor::SyscallSignal m_allSyscallsSignal;
+	std::map<int, LinuxSyscallMonitor::SyscallSignal> m_signals;
 	LinuxSyscallMonitor::SyscallReturnSignalsMap m_returnSignals;
 	LinuxSyscallMonitor* m_plugin;
-	
 public:
-	std::map<int, LinuxSyscallMonitor::SyscallSignal> m_signals;
-	//std::vector<LinuxSyscallMonitor::SyscallSignal> m_signals;
 	virtual LinuxSyscallMonitorState* clone() const;
 	static PluginState *factory(Plugin *p, S2EExecutionState *s);
-
-	sigc::connection m_InterruptSignal;
 
 	friend class LinuxSyscallMonitor;
 };

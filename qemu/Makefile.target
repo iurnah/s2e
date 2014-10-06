@@ -462,6 +462,7 @@ s2eobj-i386-y += s2e/Plugins/LinuxMonitor.o
 s2eobj-i386-y += s2e/Plugins/InterruptMonitor.o
 s2eobj-i386-y += s2e/Plugins/LinuxInterruptMonitor.o
 s2eobj-i386-y += s2e/Plugins/LinuxSyscallMonitor.o
+s2eobj-i386-y += s2e/Plugins/DataStructureMonitor.o
 s2eobj-i386-y += s2e/Plugins/X86FunctionMonitor.o
 s2eobj-i386-y += s2e/Plugins/LibraryCallMonitor.o
 s2eobj-i386-y += s2e/Plugins/InterruptInjector.o
