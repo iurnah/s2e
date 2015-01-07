@@ -9,4 +9,7 @@ tags
 s2e-out-*
 s2e-last
 build/
-s2e-discs/
+*.raw.s2e
+*.raw
+*.raw.s2e.1
+version.png
