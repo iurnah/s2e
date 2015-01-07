@@ -1,0 +1,25 @@
+[b779c424] execve("./gettimeofday", ["./gettimeofday"], [/* 32 vars */]) = 0
+[b772825d] brk(0)                       = 0x93ca000
+[b7729461] access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+[b77295a3] mmap2(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7710000
+[b7729461] access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
+[b7729324] open("/etc/ld.so.cache", O_RDONLY) = 3
+[b77292ee] fstat64(3, {st_mode=S_IFREG|0644, st_size=76194, ...}) = 0
+[b77295a3] mmap2(NULL, 76194, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb76fd000
+[b772935d] close(3)                     = 0
+[b7729461] access("/etc/ld.so.nohwcap", F_OK) = -1 ENOENT (No such file or directory)
+[b7729324] open("/lib/i386-linux-gnu/i686/cmov/libc.so.6", O_RDONLY) = 3
+[b77293a4] read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0\300o\1\0004\0\0\0"..., 512) = 512
+[b77292ee] fstat64(3, {st_mode=S_IFREG|0755, st_size=1441960, ...}) = 0
+[b77295a3] mmap2(NULL, 1452408, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb759a000
+[b77295a3] mmap2(0xb76f7000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x15d) = 0xb76f7000
+[b77295a3] mmap2(0xb76fa000, 10616, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb76fa000
+[b772935d] close(3)                     = 0
+[b77295a3] mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7599000
+[b7714cef] set_thread_area({entry_number:-1 -> 6, base_addr:0xb75998d0, limit:1048575, seg_32bit:1, contents:0, read_exec_only:0, limit_in_pages:1, seg_not_present:0, useable:1}) = 0
+[b7729624] mprotect(0xb76f7000, 8192, PROT_READ) = 0
+[b7729624] mprotect(0xb772f000, 4096, PROT_READ) = 0
+[b77295e1] munmap(0xb76fd000, 76194)    = 0
+[b7712424] gettimeofday({1412555009, 387561}, NULL) = 0
+[b7712424] gettimeofday({1412555009, 387738}, NULL) = 0
+[b7712424] exit_group(0)                = ?

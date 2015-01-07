@@ -29,7 +29,7 @@ scp <your_login_on_host>@<your_host_name>:path/to/tutorial1.c .
 # guest command
 #
 ###################################################################################
-LD_PRELOAD=../init_env.so ./open_init_env --select-process --sym-args 0 1 1; ../s2ecmd kill 0 "first test"
+LD_PRELOAD=./guest/build/init_env.so ./prog2 --select-process-code --sym-args 0 1 1; ./guest/build/s2ecmd kill 0 "message want to output"
 
 #3. ###############################################################################
 #

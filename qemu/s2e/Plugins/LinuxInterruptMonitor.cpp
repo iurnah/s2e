@@ -65,7 +65,9 @@ void LinuxInterruptMonitor::initialize()
 
 	//we use onModuleTransitionSelector from LinuxCodeSelector to enable signal
 	//emition from the interested module.
-	m_LinuxCodeSelector->onModuleTransitionSelector.connect(sigc::mem_fun(*this, &LinuxInterruptMonitor::onModuleTransition));
+	m_LinuxCodeSelector->onModuleTransitionSelector.connect(sigc::mem_fun(*this, 
+							&LinuxInterruptMonitor::onModuleTransition));
+
 }
 
 // This member function connect onTranslateBlockEnd from CorePlugins to make

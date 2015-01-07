@@ -10,13 +10,15 @@
 #include "DataStructureMonitor.h"
 #include "LinuxSyscallMonitor.h"
 
+#include <llvm/Support/TimeValue.h>
+
 #define SYSCALL_NUM_MAX 349
 
 namespace s2e{
 namespace plugins{
 	
 S2E_DEFINE_PLUGIN(DataStructureMonitor, "Retrive Data Structure plugin",
-			   "DataStructureMonitor", "LinuxSyscallMonitor",
+			   "DataStructureMonitor", "LinuxSyscallMonitor", "LinuxMemoryTracer",
 			   "LinuxCodeSelector", "LinuxExecutionDetector");
 
 DataStructureMonitor::SyscallInformation DataStructureMonitor::m_syscallInformation[] = { 
@@ -32,8 +34,11 @@ void DataStructureMonitor::initialize(){
 	assert(m_LinuxSyscallMonitor);
 
 	m_LinuxCodeSelector = (LinuxCodeSelector*)s2e()->getPlugin("LinuxCodeSelector");
-	assert(m_LinuxSyscallMonitor);
-	
+	assert(m_LinuxCodeSelector);
+
+	m_LinuxMemoryTracer = (LinuxMemoryTracer*)s2e()->getPlugin("LinuxMemoryTracer");
+	assert(m_LinuxMemoryTracer);
+
 	//Fetch the list of modules where forking should be enabled
     ConfigFile *cfg = s2e()->getConfig();
 	bool ok = false;
@@ -89,22 +94,9 @@ void DataStructureMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
                                           TranslationBlock *tb,
                                           uint64_t pc, bool, uint64_t)
 {
-	//TODO: how to connect other plgState signals at this step.	
-	//s2e()->getDebugStream() << "DataStructureMonitor::onTranslateBlockEnd: IN" << "\n";
 	DECLARE_PLUGINSTATE(DataStructureMonitorState, state);
-	// connect the onInt80syscallSignal and the onSysenterSyscallSignal when we enter the interested module
 	if(m_LinuxSyscallMonitor){
-#if 0
-		if(!m_onInt80Connected){//make sure only connect once
-			m_LinuxSyscallMonitor->getSyscallSignal(state, SYSCALL_INT).connect(
-						sigc::mem_fun(*this, &DataStructureMonitor::onInt80SyscallSignal));
-
-			s2e()->getDebugStream() << "DataStructureMonitor::onTranslateBlockEnd: onInt80SyscallSignal is connected!" << "\n";
-
-			m_onInt80Connected = true;
-		}		
-#endif
-		if(!plgState->m_onInt80SyscallSignal.connected()){
+		if(!plgState->m_onInt80SyscallSignal.connected()){//connect syscall signal for the particular state.
 			plgState->m_onInt80SyscallSignal = m_LinuxSyscallMonitor->getSyscallSignal(state, SYSCALL_INT).connect(
 						sigc::mem_fun(*this, &DataStructureMonitor::onInt80SyscallSignal));
 
@@ -117,90 +109,260 @@ void DataStructureMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
  
 			s2e()->getDebugStream(state) << "DataStructureMonitor::onTranslateBlockEnd: onSysenterSyscallSignal is connected!" << "\n";
 		}
-#if 0
-		if(!m_onSysenterConnected){//make sure only connect once
-			m_LinuxSyscallMonitor->getSyscallSignal(state, SYSCALL_SYSENTER).connect(
-						sigc::mem_fun(*this, &DataStructureMonitor::onSysenterSyscallSignal));
-
-			s2e()->getDebugStream() << "DataStructureMonitor::onTranslateBlockEnd: onSysenterSyscallSignal is connected!" << "\n";
-
-			m_onSysenterConnected = true;
-		}		
-#endif
 	}else{
-		s2e()->getWarningsStream() << "LinuxIniterruptMonitor plugin is missing, "
-											"Cannot monitor syscalls via int 0x80" << '\n';
+		s2e()->getWarningsStream() << "LinuxSyscallMonitor is missing, "
+											"Cannot monitor syscalls via int 0x80 and sysenter instruction" << '\n';
 	}
-
 }
 
+/*
+ * TODO: get the timestamp here.
+ */
 void DataStructureMonitor::onInt80SyscallSignal(
 							S2EExecutionState *state, 
 							uint64_t pc, 
 							SyscallType type, 
 							uint32_t SyscallNr)
 {
+	DECLARE_PLUGINSTATE(DataStructureMonitorState, state);
+
 	assert(SyscallNr >= 0 && SyscallNr <= SYSCALL_NUM_MAX);
 
 	s2e()->getDebugStream(state) << "onInt80SyscallSignal " << SyscallNr << '\n';
-	s2e()->getMemoryTypeStream(state) << "onInt80SyscallSignal " << SyscallNr << '\n';
+	//s2e()->getMemoryTypeStream(state) << "onInt80SyscallSignal " << SyscallNr << '\n';
 
 	if(SyscallNr > SYSCALL_NUM_MAX){
 		s2e()->getWarningsStream(state) << "DataStructureMonitor::onInt80SyscallSignal: Invalid Syscall number!" << '\n';
 		s2e()->getMemoryTypeStream(state) << "DataStructureMonitor::onInt80SyscallSignal: Invalid Syscall number!" << '\n';
 	}
 
-	target_ulong cr3 = state->readCpuState(CPU_OFFSET(cr[3]), sizeof(target_ulong) * 8);
+	//target_ulong cr3 = state->readCpuState(CPU_OFFSET(cr[3]), sizeof(target_ulong) * 8);
 
 	int argc = getSyscallInformation(SyscallNr).argcount;
-	s2e()->getMemoryTypeStream(state) << "PID=" << hexval(cr3) << ", PC=" << hexval(pc) << ", SYSCALLNO:" << SyscallNr << " = "  
-			<< getSyscallInformation(SyscallNr).name << ", (argN=" << getSyscallInformation(SyscallNr).argcount << ") " << "\n";
+	//s2e()->getMemoryTypeStream(state) << "PID=" << hexval(cr3) << ", PC=" << hexval(pc) << ", SYSCALLNO:" << SyscallNr << " = "  
+	//		<< getSyscallInformation(SyscallNr).name << ", (argN=" << getSyscallInformation(SyscallNr).argcount << ") " << "\n";
+#if 0
+	uint64_t timestamp = llvm::sys::TimeValue::now().usec();
+	s2e()->getMemoryTypeStream() << timestamp << " ";
+#endif
+	s2e()->getMemoryTypeStream() << "s:" << llvm::sys::TimeValue::now().seconds() 
+								 << "m:" << llvm::sys::TimeValue::now().milliseconds() 
+								 << "u:" << llvm::sys::TimeValue::now().microseconds() 
+								 << "n:" << llvm::sys::TimeValue::now().nanoseconds() << " ";
+
 	switch(argc){
 		case 0: 
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " ();" << '\n';
 				s2e()->getMemoryTypeStream(state) << "NONE" << '\n';
 				break;
 		case 1: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
-				s2e()->getMemoryTypeStream(state) << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n';
-
+				argCounts += 1;
+				plgState->argCounts += 1;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+							(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+
+				//output the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+							(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+				//output the overall statistics and perstate information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+							(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+				m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+											<< plgState->pointerArgCounts - plgState->overwrittenCounts <<'\n';
+
+				
 				break;
 		case 2: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
 
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n';
+				plgState->argCounts += 2;
+				argCounts += 2;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], "
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))<< "], "
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+
+				//output the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))<< "], "
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx))
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+				//output the overall statistics and the perstate information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))<< "], "
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 		case 3: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDX]), &(s.edx), sizeof (uint32_t) );
 				
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(SyscallNr).arg2 << '\n';
+				argCounts += 3;
+				plgState->argCounts += 3;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "], "
-						<< getSyscallInformation(SyscallNr).arg2 << "[" << hexval(s.edx) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+
+				//output the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) 
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+				//output the overall statistics and the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx);
+
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 		case 4: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDX]), &(s.edx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESI]), &(s.esi), sizeof (uint32_t) );
 				
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(SyscallNr).arg2 << '\n'
-											 << hexval(s.esi) << " = " << getSyscallInformation(SyscallNr).arg3 << '\n';
+				argCounts += 4;
+				plgState->argCounts += 4;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg2 << "[" << hexval(s.edx) << "], "
-						<< getSyscallInformation(SyscallNr).arg3 << "[" << hexval(s.esi) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+				
+				//output the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi))
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+				//output the overall statistics and the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+			
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx);
+					   	m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi);
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 		case 5: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
@@ -208,17 +370,81 @@ void DataStructureMonitor::onInt80SyscallSignal(
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESI]), &(s.esi), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDI]), &(s.edi), sizeof (uint32_t) );
 
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(SyscallNr).arg2 << '\n'
-											 << hexval(s.esi) << " = " << getSyscallInformation(SyscallNr).arg3 << '\n'
-											 << hexval(s.edi) << " = " << getSyscallInformation(SyscallNr).arg4 << '\n';
+				argCounts += 5 ;
+				plgState->argCounts += 5 ;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg2 << "[" << hexval(s.edx) << "], "
-						<< getSyscallInformation(SyscallNr).arg3 << "[" << hexval(s.esi) << "], "
-						<< getSyscallInformation(SyscallNr).arg4 << "[" << hexval(s.edi) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+				
+				//output the perState information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) 
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+			//output the overall statistics and the perState information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+			
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edi); 
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 		case 6: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
@@ -227,19 +453,92 @@ void DataStructureMonitor::onInt80SyscallSignal(
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDI]), &(s.edi), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBP]), &(s.ebp), sizeof (uint32_t) );
 				
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(SyscallNr).arg2 << '\n'
-											 << hexval(s.esi) << " = " << getSyscallInformation(SyscallNr).arg3 << '\n'
-											 << hexval(s.edi) << " = " << getSyscallInformation(SyscallNr).arg4 << '\n'
-											 << hexval(s.ebp) << " = " << getSyscallInformation(SyscallNr).arg5 << '\n';
+				argCounts += 6;
+				plgState->argCounts += 6;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg2 << "[" << hexval(s.edx) << "], "
-						<< getSyscallInformation(SyscallNr).arg3 << "[" << hexval(s.esi) << "], "
-						<< getSyscallInformation(SyscallNr).arg4 << "[" << hexval(s.edi) << "], "
-						<< getSyscallInformation(SyscallNr).arg5 << "[" << hexval(s.ebp) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg5 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebp, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebp)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+				
+				//output the perstate information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg5 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebp, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebp)) 
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+			//output the overall statistics and the perstate information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg5 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebp, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebp)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+			
+					   	m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edi);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebp, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebp);
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 	}
 }
@@ -257,16 +556,21 @@ const DataStructureMonitor::SyscallInformation& DataStructureMonitor::getSyscall
 	return m_syscallInformation[syscallNr];
 }
 
+/*
+ * TODO: get the timestamp here.
+ */
 void DataStructureMonitor::onSysenterSyscallSignal(
 							S2EExecutionState *state, 
 							uint64_t pc, 
 							SyscallType type, 
 							uint32_t SyscallNr)
 {
+	DECLARE_PLUGINSTATE(DataStructureMonitorState, state);
+
 	assert(SyscallNr >= 0 && SyscallNr <= SYSCALL_NUM_MAX);
 
 	s2e()->getDebugStream(state) << "onSysenterSyscallSignal " << SyscallNr << '\n';
-	s2e()->getMemoryTypeStream(state) << "onSysenterSyscallSignal " << SyscallNr << '\n';
+	//s2e()->getMemoryTypeStream(state) << "onSysenterSyscallSignal " << SyscallNr << '\n';
 
 
 	if(SyscallNr > SYSCALL_NUM_MAX){
@@ -274,57 +578,233 @@ void DataStructureMonitor::onSysenterSyscallSignal(
 		s2e()->getMemoryTypeStream(state) << "DataStructureMonitor::onSysenterSyscallSignal: Invalid Syscall number!" << '\n';
 	}
 
-	target_ulong cr3 = state->readCpuState(CPU_OFFSET(cr[3]), sizeof(target_ulong) * 8);
+	//target_ulong cr3 = state->readCpuState(CPU_OFFSET(cr[3]), sizeof(target_ulong) * 8);
 
 	int argc = getSyscallInformation(SyscallNr).argcount;
+	/*
 	s2e()->getMemoryTypeStream(state) << "PID=" << hexval(cr3) << ", PC=" << hexval(pc) << ", SYSCALLNO:" << SyscallNr << " = "  
 			<< getSyscallInformation(SyscallNr).name << ", (argN=" << getSyscallInformation(SyscallNr).argcount << ") " << '\n';
+	*/
+#if 0
+	uint64_t timestamp = llvm::sys::TimeValue::now().usec();
+	s2e()->getMemoryTypeStream() << timestamp << " ";
+#endif
+	s2e()->getMemoryTypeStream() << "s:" << llvm::sys::TimeValue::now().seconds() 
+								 << "m:" << llvm::sys::TimeValue::now().milliseconds() 
+								 << "u:" << llvm::sys::TimeValue::now().microseconds() 
+								 << "n:" << llvm::sys::TimeValue::now().nanoseconds() << " ";
 	switch(argc){
 		case 0: 
 				s2e()->getMemoryTypeStream(state) << "NONE" << '\n';
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " ();" << '\n';
 				break;
 		case 1: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
-				s2e()->getMemoryTypeStream(state) << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n';
+				argCounts += 1;
+				plgState->argCounts += 1;
 
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+							(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+
+				//output the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+							(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+				//output the overall statistics and perstate information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+							(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+				m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
+
 				break;
 		case 2: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
 
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n';
+				argCounts += 2;
+				plgState->argCounts += 2;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], "
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))<< "], "
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+				//output the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))<< "], "
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx))
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+				//output the overall statistics and the perstate information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx))<< "], "
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 		case 3: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDX]), &(s.edx), sizeof (uint32_t) );
 				
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(SyscallNr).arg2 << '\n';
+				argCounts += 3;
+				plgState->argCounts += 3;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "], "
-						<< getSyscallInformation(SyscallNr).arg2 << "[" << hexval(s.edx) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+
+				//output the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) 
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+				//output the overall statistics and the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx);
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 		case 4: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDX]), &(s.edx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESI]), &(s.esi), sizeof (uint32_t) );
 				
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(SyscallNr).arg2 << '\n'
-											 << hexval(s.esi) << " = " << getSyscallInformation(SyscallNr).arg3 << '\n';
+				argCounts += 4;
+				plgState->argCounts += 4;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg2 << "[" << hexval(s.edx) << "], "
-						<< getSyscallInformation(SyscallNr).arg3 << "[" << hexval(s.esi) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+				
+				//output the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi))
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+				//output the overall statistics and the perstate information.
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+			
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx);
+					   	m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi);
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 		case 5: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
@@ -332,17 +812,81 @@ void DataStructureMonitor::onSysenterSyscallSignal(
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ESI]), &(s.esi), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDI]), &(s.edi), sizeof (uint32_t) );
 
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(SyscallNr).arg2 << '\n'
-											 << hexval(s.esi) << " = " << getSyscallInformation(SyscallNr).arg3 << '\n'
-											 << hexval(s.edi) << " = " << getSyscallInformation(SyscallNr).arg4 << '\n';
+				argCounts += 5;
+				plgState->argCounts += 5;
+#if 0
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg2 << "[" << hexval(s.edx) << "], "
-						<< getSyscallInformation(SyscallNr).arg3 << "[" << hexval(s.esi) << "], "
-						<< getSyscallInformation(SyscallNr).arg4 << "[" << hexval(s.edi) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edi))
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+				
+				//output the perState information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) 
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+			//output the overall statistics and the perState information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+			
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edi); 
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 		case 6: state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBX]), &(s.ebx), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_ECX]), &(s.ecx), sizeof (uint32_t) );
@@ -351,19 +895,92 @@ void DataStructureMonitor::onSysenterSyscallSignal(
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EDI]), &(s.edi), sizeof (uint32_t) );
 				state->readCpuRegisterConcrete (CPU_OFFSET (regs[R_EBP]), &(s.ebp), sizeof (uint32_t) );
 				
-				s2e()->getMemoryTypeStream() << hexval(s.ebx) << " = " << getSyscallInformation(SyscallNr).arg0 << '\n'
-											 << hexval(s.ecx) << " = " << getSyscallInformation(SyscallNr).arg1 << '\n'
-											 << hexval(s.edx) << " = " << getSyscallInformation(SyscallNr).arg2 << '\n'
-											 << hexval(s.esi) << " = " << getSyscallInformation(SyscallNr).arg3 << '\n'
-											 << hexval(s.edi) << " = " << getSyscallInformation(SyscallNr).arg4 << '\n'
-											 << hexval(s.ebp) << " = " << getSyscallInformation(SyscallNr).arg5 << '\n';
+				argCounts += 6;
+				plgState->argCounts += 6;
+#if 0				
+				//output the overall statistics
 				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
-						<< getSyscallInformation(SyscallNr).arg0 << "[" << hexval(s.ebx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg1 << "[" << hexval(s.ecx) << "], " 
-						<< getSyscallInformation(SyscallNr).arg2 << "[" << hexval(s.edx) << "], "
-						<< getSyscallInformation(SyscallNr).arg3 << "[" << hexval(s.esi) << "], "
-						<< getSyscallInformation(SyscallNr).arg4 << "[" << hexval(s.edi) << "], "
-						<< getSyscallInformation(SyscallNr).arg5 << "[" << hexval(s.ebp) << "]);" << '\n';
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg5 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebp, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebp)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << '\n';
+				
+				//output the perstate information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg5 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebp, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebp)) 
+						<< "]); Statistics=" << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << '\n';
+#endif
+				//output the overall statistics and the perstate information
+				s2e()->getMemoryTypeStream(state) << getSyscallInformation(SyscallNr).name << " (" 
+						<< getSyscallInformation(SyscallNr).arg0 << "[" << 
+					   	(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg1 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ecx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx)) << "], " 
+						<< getSyscallInformation(SyscallNr).arg2 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edx, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edx)) << "], "
+						<< getSyscallInformation(SyscallNr).arg3 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.esi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.esi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg4 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.edi, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.edi)) << "], "
+						<< getSyscallInformation(SyscallNr).arg5 << "[" << 
+						(m_LinuxMemoryTracer->checkOverWrittenAddressesById(
+							state->getID(), s.ebp, pointerArgCounts, overwrittenCounts) ? 0xdeadbeef : hexval(s.ebp)) 
+						<< "]); Statistics=" << argCounts << ", " << pointerArgCounts << ", " << overwrittenCounts << ", " 
+						<< pointerArgCounts - overwrittenCounts << ", ";
+
+			
+					   	m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ecx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ecx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edx, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edx);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.esi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.esi);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.edi, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.edi);
+						m_LinuxMemoryTracer->checkOverWrittenAddressesByState(
+							state, s.ebp, plgState->pointerArgCounts, plgState->overwrittenCounts) ? 0xdeadbeef : hexval(s.ebp);
+				s2e()->getMemoryTypeStream() << plgState->argCounts << ", " << plgState->pointerArgCounts << ", " << plgState->overwrittenCounts << ", " 
+					<< plgState->pointerArgCounts - plgState->overwrittenCounts << '\n';
+
 				break;
 	}
 }

@@ -22,6 +22,7 @@ plugins = {
   --"InterruptMonitor",  
   "LinuxInterruptMonitor",
   "LinuxSyscallMonitor",
+  "LinuxMemoryTracer",
   "DataStructureMonitor",
   --"X86FunctionMonitor",
   --"LibraryCallMonitor",
@@ -51,6 +52,16 @@ pluginsConfig.LinuxExecutionDetector = {
     kernelMode = false,	
   },
 
+  ld = {
+    moduleName = "ld-2.13.so",
+    kernelMode = false,	
+  },
+
+  libdl = {
+    moduleName = "libdl-2.13.so",
+    kernelMode = false,	
+  },
+
   trackAllModules = true,
   configureAllModules = false  
 }
@@ -73,6 +84,12 @@ pluginsConfig.LinuxSyscallMonitor = {
 	--moduleIds = { "prog2", "init_env.so" }
 	moduleIds = { "prog2", "libc-2.13.so" }
 
+}
+
+pluginsConfig.LinuxMemoryTracer = {
+--this should specify all the user space modules.
+	moduleIds = { "prog2", "init_env.so", "libc-2.13.so", "ld-2.13.so", "libdl-2.13.so"}, 
+	timeTrigger = 2
 }
 
 pluginsConfig.DataStructureMonitor = {

@@ -6,3 +6,7 @@
 /guest/s2eget/s2eget
 cscope.out
 tags
+s2e-out-*
+s2e-last
+build/
+s2e-discs/

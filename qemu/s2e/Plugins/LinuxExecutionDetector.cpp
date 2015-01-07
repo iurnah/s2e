@@ -124,10 +124,16 @@ void LinuxExecutionDetector::initializeConfiguration()
         ModuleExecutionCfg d;
         std::stringstream s;
         s << getConfigKey() << "." << *it << ".";
+		//some trick played for the compatibility of the config file and the
+		//init_env.c
 		if(*it == "init_env_id")
 	        d.id = "init_env.so";
 		else if(*it == "libc")
 			d.id = "libc-2.13.so";
+		else if(*it == "ld")
+			d.id = "ld-2.13.so";
+		else if(*it == "libdl")
+			d.id = "libdl-2.12.so";
 		else
 			d.id = *it;
 
@@ -248,6 +254,8 @@ void LinuxExecutionDetector::onTranslateBlockStart(
 	/* this getDescriptor method should be able to return the module based on
 	 * its pid and PC value */
 
+	/* we might don't need this onExecution to connect, because
+	 * translateBlockStart doesn't mean execution */
 	if(currentModule){
 //		s2e()->getDebugStream() << "LinuxExecutionDetector::onTranslateBlockStart: currentModule: Pid=" << currentModule->Pid << " name=" << currentModule->Name << " PC=" << hexval(pc) << '\n'; 
 

@@ -1,0 +1,8 @@
+stateId	address
+0	1	
+2	21	
+4	65	
+5	45	
+16	82	
+20	101	
+Total size = 601

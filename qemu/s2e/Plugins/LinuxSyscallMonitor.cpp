@@ -102,8 +102,8 @@ void LinuxSyscallMonitor::onTranslateBlockEnd(ExecutionSignal *signal,
                                           TranslationBlock *tb,
                                           uint64_t pc, bool, uint64_t)
 {
-	//TODO how to connect other plgState signals at this step, so no matter in
-	//which plgState, it will call the callback
+	// connect each different plgState signals at this step, so no matter in
+	// which plgState, it will call the callback
 	DECLARE_PLUGINSTATE(LinuxSyscallMonitorState, state);
 #if 0	
 	// connect the Int80 interrupt signal for the current plgState when we 
@@ -146,7 +146,7 @@ void LinuxSyscallMonitor::onInt80(S2EExecutionState* state, uint64_t pc, int int
 		}else {
 			s2e()->getDebugStream(state) << "LinuxSyscallMonitor::onInt80SyscallSignal, With Symbolic syscall number (EAX)!" << '\n';
 			s2e()->getWarningsStream(state) << "LinuxSyscallMonitor::onInt80SyscallSignal, With Symbolic syscall number (EAX)!" << '\n';
-			s2e()->getMemoryTypeStream(state) << "LinuxSyscallMonitor::onInt80SyscallSignal, With Symbolic syscall number (EAX)!" << '\n';
+			//s2e()->getMemoryTypeStream(state) << "LinuxSyscallMonitor::onInt80SyscallSignal, With Symbolic syscall number (EAX)!" << '\n';
 		}
 	}
 }

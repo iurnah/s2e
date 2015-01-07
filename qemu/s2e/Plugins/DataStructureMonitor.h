@@ -17,6 +17,7 @@
 #include "DataStructureMonitor.h"
 #include "LinuxInterruptMonitor.h"
 #include "LinuxSyscallMonitor.h"
+#include "LinuxMemoryTracer.h"
 
 namespace s2e{
 namespace plugins{
@@ -27,13 +28,18 @@ class DataStructureMonitor: public Plugin
 
 	LinuxExecutionDetector *m_executionDetector;
 	LinuxSyscallMonitor* m_LinuxSyscallMonitor;
-
 	LinuxCodeSelector* m_LinuxCodeSelector;
+	LinuxMemoryTracer* m_LinuxMemoryTracer;
+
 	std::set<std::string> m_interceptedModules;
 	sigc::connection m_onTranslateBlockEnd;
 
 	bool m_onInt80Connected;
 	bool m_onSysenterConnected;
+	uint32_t argCounts;//total parameters retrived including int type.
+	uint32_t pointerArgCounts;//parameters retrived only including pointers.
+	uint32_t overwrittenCounts;//pointers that have been overwritten.
+
 	struct SSyscallInformation
 	{
 		int index;
@@ -106,6 +112,10 @@ class DataStructureMonitorState: public PluginState
 public:
 	virtual DataStructureMonitorState* clone() const;
 	static PluginState *factory(Plugin *p, S2EExecutionState *s);
+
+	uint32_t argCounts;//total parameters retrived including int type.
+	uint32_t pointerArgCounts;//parameters retrived only including pointers.
+	uint32_t overwrittenCounts;//pointers that have been overwritten.
 
 	sigc::connection m_onInt80SyscallSignal;
 	sigc::connection m_onSysenterSyscallSignal;

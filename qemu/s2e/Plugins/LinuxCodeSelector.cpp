@@ -118,33 +118,28 @@ void LinuxCodeSelector::onModuleTransition(
 {
 
     if (!currentModule) {
+		//disable forking if not interested module
         state->disableForking();
-		//s2e()->getDebugStream(state) << "LinuxCodeSelector::disableForking because of currentModule entered is NULL" << '\n';
         return;
     }
 	
-	//s2e()->getDebugStream(state) << "LinuxCodeSelector::onModuleTransition" << '\n';
-
 #if 0
 	if(prevModule == NULL){
 		s2e()->getDebugStream(state) << "LinuxCodeSelector::onModuleTransition: prevModule=NULL" << '\n';
 	}else 
 		s2e()->getDebugStream(state) << "LinuxCodeSelector::onModuleTransition: prevModule=" << 
 			prevModule->Name << " currentModule=" << currentModule->Name << '\n';
-
 #endif
 
-   // id here is just name from the init_env.c file.
-   // const std::string *id = m_executionDetector->getModuleId(*currentModule);
-
 	if (m_interceptedModules.find(currentModule->Name) == m_interceptedModules.end()) {
+		//if current module is not in interceptedModule, disableForking.
         state->disableForking(); 
-		//s2e()->getDebugStream(state) << "LinuxCodeSelector::disableForking because of enter not intercept module" << '\n';
         return;
-    }
+    }else { //else enableForking
+		state->enableForking();
+	}
 
-    state->enableForking();
-
+	//emit signal inform when Module Transition is happened
 	onModuleTransitionSelector.emit(state, prevModule, currentModule);
 }
 
@@ -208,25 +203,28 @@ void LinuxCodeSelector::onPrivilegeChange(
 	}
 }
 
-//when we use the select-process-code, we don't use opcode AE 00 and AE 01 for
-//code selector. We only use the AE 02 for opSelectModule
 void LinuxCodeSelector::opSelectProcess(S2EExecutionState *state)
 {
     bool ok = true;
     target_ulong isUserSpace;
+	//we have macro #define IS_USERSPACE regs[R_ECX]
     ok &= state->readCpuRegisterConcrete(CPU_OFFSET(IS_USERSPACE), &isUserSpace,
                                                     sizeof isUserSpace);
 
 
     if (isUserSpace) {
         //Track the current process, but user-space only
+		//false here mean we are not tracking pid,
         m_pidsToTrack[state->getPid()] = false;
+
 
         if (!m_privilegeTracking.connected()) {
             m_privilegeTracking = s2e()->getCorePlugin()->onPrivilegeChange.connect(
                     sigc::mem_fun(*this, &LinuxCodeSelector::onPrivilegeChange));
         }
-    } else { //~~this eles might be not usable by Rui~~
+    } else { 
+		//"true" means we are going to track this pid, i.e. whole process
+		//address space.
         m_pidsToTrack[state->getPid()] = true;
 
         if (!m_privilegeTracking.connected()) {
@@ -235,7 +233,9 @@ void LinuxCodeSelector::opSelectProcess(S2EExecutionState *state)
         } 
 		/* misunderstand the code, thought it is a bug, infact, not, so comment
 		 * out this section, */
-		/*
+		/* it actually doesn't matter whether you use the "m_privilegeTracking"
+		 * or 'm_addressSpaceTracking', both will work, they didn't affect the
+		 * code logic.
         if (!m_addressSpaceTracking.connected()) {
             m_addressSpaceTracking = s2e()->getCorePlugin()->onPageDirectoryChange.connect(
                     sigc::mem_fun(*this, &LinuxCodeSelector::onPageDirectoryChange));
@@ -270,6 +270,9 @@ void LinuxCodeSelector::opUnselectProcess(S2EExecutionState *state)
     }
 }
 
+//when we use the select-process-code, we don't use opcode AE 00 and AE 01 for
+//code selector. We only use the AE 02 for opSelectModule. This opcode just add
+//the module name to the m_interceptedModules
 bool LinuxCodeSelector::opSelectModule(S2EExecutionState *state)
 {
     bool ok = true;
@@ -293,8 +296,8 @@ bool LinuxCodeSelector::opSelectModule(S2EExecutionState *state)
 	//TODO why check configuration in LinuxExecutionDetector? modify?
     if (m_executionDetector->isModuleConfigured(strModuleId)) {
         if(m_interceptedModules.find(strModuleId) == m_interceptedModules.end()){
+			//if not exist, we insert it here manually
 			m_interceptedModules.insert(strModuleId);
-
 			s2e()->getWarningsStream() << "[opCode]LinuxCodeSelector: " <<
                 "Module " << strModuleId << " is insert to m_interceptedModules\n";
 		}else 
@@ -324,16 +327,21 @@ void LinuxCodeSelector::onCustomInstruction(
     uint64_t subfunction = OPCODE_GETSUBFUNCTION(operand);
 
     switch(subfunction) {
-        //Track the currently-running process (either whole passed system or user-space only)
+        //TODO:Track the currently-running process (either whole passed system or user-space only)
+		//s2e_codeselector_enable_address_space(unsigned user_mode_only)
+		//
+		//parameter "user_mdoe_only" is stored in the ecx registers.
         case 0: {
             opSelectProcess(state);
         }
         break;
 
-
         //Disable tracking of the selected process
         //The process's id to not track is in the ecx register.
         //If ecx is 0, untrack the current process.
+		//
+		//s2e_codeselector_disable_address_space(unsigned user_mode_only)
+		//This has never been used in the code.
         case 1: {
             opUnselectProcess(state);
         }
@@ -342,6 +350,8 @@ void LinuxCodeSelector::onCustomInstruction(
         //Adds the module id specified in ecx to the list
         //of modules where to enable forking.
 		//this correspond to the --select-process-code option
+		//
+		//s2e_codeselector_select_module(const char *moduleId)
         case 2: {
             if (opSelectModule(state)) {
                 tb_flush(env);

@@ -1,0 +1,4 @@
+addr_type.txt	-address and corresponding data structure.
+sec_count1.txt	-number of discovered data structure in each second during execution.
+addr_count2.txt -number of times the discovered data structure that have been discovered in different time or path.
+path_count3.txt -number of discovered data structure in each different path.
